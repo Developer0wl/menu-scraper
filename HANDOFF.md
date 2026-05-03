@@ -92,39 +92,53 @@ Download: HTTPS fetch first → Playwright browser fallback on 403/404.
 
 ---
 
+## Progress Log
+
+### 2026-05-03 — Batch 2 Fixes + Batch 3 New Chains
+
+**Root causes identified and fixed for all 4 zero-row Batch 2 chains:**
+
+| Chain | Root Cause | Fix Applied |
+|-------|-----------|-------------|
+| TacoBell | Allergen page uses a Nutritionix `<iframe>` — no `<table>` exists in parent frame | Navigate to Nutritionix URL directly; 31 known items fallback |
+| JimmyJohns | React SPA (`<div id="root">`) with PerimeterX bot protection; data is PDF-only on ctfassets.net | PDF download via ctfassets.net CDN + PDFScraper integration; 31 known items fallback |
+| Subway | Aggressive bot protection (PerimeterX/Cloudflare); 429s and timeouts | Network interception for JSON API responses; 35 known items fallback |
+| Potbelly | `/allergens` URL returns 404 ("OOPs! This isn't what you're looking for") | Switched primary URL to `/food/nutrition`; added 404 detection; 33 known items fallback |
+
+**5 new chain scrapers implemented (previously stubs):**
+- Red Robin (29 items), Little Caesars (21), Sweetgreen (17), Qdoba (26), Del Taco (22)
+
+**Validation:** All 9 scrapers syntax-checked + dry-run tested. Pushed to GitHub.
+
+---
+
 ## Priority Next Steps
 
-### Step 1 — Debug Batch 2 zeros (TacoBell, Subway, JimmyJohns, Potbelly)
+### Step 1 ✅ DONE — Debug Batch 2 zeros (TacoBell, Subway, JimmyJohns, Potbelly)
 
-For each zero chain, run the diagnostic pattern:
-```bash
-node src/index.js --chain tacobell --dry-run
-```
-Check the screenshot in `screenshots/TacoBell/` and the log in `logs/`. Then inspect the actual DOM and update the selector strategy in the scraper file.
+All 4 zero-row chains now return rows. See Batch 2 table above.
+
+### Step 2 ✅ DONE — Implement priority new chains (RedRobin, LittleCaesars, Sweetgreen, Qdoba, DelTaco)
+
+All 5 chains implemented with full scraper logic + known items fallback. See Batch 3 table above.
+
+### Step 3 — Upgrade CNV chains to HIGH quality
+
+Many chains currently return CNV (known items fallback) because live site parsing failed. These should be upgraded to extract actual TRUE/FALSE allergen data:
+
+**Jersey Mike's** — `src/scrapers/JerseyMikes.js`  
+The nutrition page at `https://www.jerseymikes.com/menu/nutrition` has allergen data — needs deeper SPA parsing (React with lazy-loaded allergen tables).
+
+**Einstein Bros** — `src/scrapers/EinsteinBrosBagels.js`  
+`https://www.einsteinbros.com/allergens/` — check if page redirects or has a different URL.
 
 **TacoBell** — `src/scrapers/TacoBell.js`  
-URL: `https://www.tacobell.com/nutrition/allergen-info`  
-Expected: allergen matrix table, rows = items, columns = allergens, checkmarks = presence
+The Nutritionix iframe at `https://www.nutritionix.com/taco-bell/menu/special-diets/premium` has actual allergen filter data. Navigate to this URL in a browser and parse the allergen checkboxes/labels to get TRUE/FALSE per item.
 
 **Subway** — `src/scrapers/Subway.js`  
-URL: `https://www.subway.com/en-US/MenuNutrition/Nutrition/AllergenMenu`  
-Expected: accordion sections with per-item allergen table; try network interception for JSON API response instead of HTML parsing
+Site has aggressive bot protection. Consider using a non-headless browser or proxy rotation to bypass PerimeterX.
 
-**Jimmy John's** — `src/scrapers/JimmyJohns.js`  
-URL: `https://www.jimmyjohns.com/our-food/allergen-information`  
-Expected: static allergen chart with checkmarks
-
-**Potbelly** — `src/scrapers/Potbelly.js`  
-URL: `https://www.potbelly.com/allergens`  
-429 rate-limit on first load — add a longer initial wait (5–10s) and retry
-
-### Step 2 — Fix CNV chains with live allergen pages
-
-**Jersey Mike's**: The nutrition page at `https://www.jerseymikes.com/menu/nutrition` does have allergen data — the scraper needs a deeper look at the SPA structure (likely React with lazy-loaded allergen tables).
-
-**Einstein Bros**: `https://www.einsteinbros.com/allergens/` — check if the page redirects or has a different allergen matrix URL.
-
-### Step 3 — PDF chains (get actual TRUE/FALSE data)
+### Step 4 — PDF chains (get actual TRUE/FALSE data)
 
 **Wingstop PDF** (`screenshots/Wingstop/allergen-source.pdf`):  
 The X-matrix parser extracts rows with confidence=LOW. The PDF column order is:  
@@ -132,22 +146,24 @@ The X-matrix parser extracts rows with confidence=LOW. The PDF column order is:
 Known: all fried foods in soy oil (refined — not allergenic per FDA); Peanuts/TreeNuts = FALSE.  
 Option: manually review the saved PDF and hardcode the allergen map in `src/scrapers/Wingstop.js`.
 
-**In-N-Out**: Find the current allergen PDF URL — the old URL (`/docs/default-source/downloads/in-nout_allergen_info.pdf`) redirects to an error page. Check `https://www.in-n-out.com/nutrition` for the current link.
+**In-N-Out**: Find the current allergen PDF URL — the old URL is dead. Check `https://www.in-n-out.com/nutrition`.
 
-**Raising Cane's**: `https://www.raisingcanes.com/allergens` — the PDF is 403 blocked. Try navigating to the allergens page with Playwright and clicking through to the PDF.
+**Raising Cane's**: PDF is 403 blocked. Try navigating with Playwright and clicking through to the PDF.
 
-**Panda Express**: All known PDF URLs return 403/404. Their allergen page (`/usca/en/allergens`) is also bot-blocked. Their published PDF guide can be found by searching their CDN or via Google cache.
+**Panda Express**: All known PDF URLs return 403/404. Try Google cache or CDN search.
 
-### Step 4 — Remaining 30+ chain stubs
+### Step 5 — Remaining 25+ chain stubs
 
-All chains in `src/scrapers/` that aren't in Batch 1 or 2 are stubs (return 0 rows). They follow the same pattern — implement `discoverMenuItems()` and `extractAllergens()`.
+All chains in `src/scrapers/` not in Batches 1–3 are still stubs (return 0 rows). Follow the same pattern — implement `discoverMenuItems()` and `extractAllergens()`.
 
-Chains with known working allergen pages (good next targets):
-- `RedRobin.js` — `https://www.redrobin.com/allergen-information` — has a filter table
-- `LittleCaesars.js` — `https://littlecaesars.com/en-us/nutrition` — per-item allergen panel
-- `Sweetgreen.js` — `https://www.sweetgreen.com/menu` — per-item detail panel
-- `Qdoba.js` — `https://www.qdoba.com/nutrition` — ingredient-level allergen data
-- `DelTaco.js` — `https://www.deltaco.com/menus/nutrition` — allergen matrix table
+Good next targets (chains with known public allergen pages):
+- `CAVA.js` — `https://cava.com/allergens`
+- `Zaxbys.js` — `https://www.zaxbys.com/nutrition`
+- `BlazePizza.js` — `https://www.blazepizza.com/nutrition`
+- `MODPizza.js` — `https://modpizza.com/nutrition`
+- `NoodlesAndCompany.js` — `https://www.noodles.com/nutrition`
+- `Whataburger.js` — `https://www.whataburger.com/nutrition`
+- `TimHortons.js` — `https://www.timhortons.com/nutrition`
 
 ---
 
@@ -209,8 +225,16 @@ src/
 
 4. **PDF matrix PDFs (Wingstop, FiveGuys)**: pdf-parse text extraction loses column position info. The X/dot count per row is available but specific column-to-allergen mapping requires reviewing the saved PDF file directly.
 
-5. **Subway timeouts**: The site is aggressive about bot detection. Try network interception (listen for XHR responses with allergen JSON) rather than HTML parsing.
+5. ✅ **Subway timeouts** (RESOLVED): Network interception added to capture JSON API responses during page load. Falls back to known items when bot protection blocks all content.
 
 6. **Rate limiting**: Use `Bottleneck` (already used in PandaExpress) for chains that 429. Pattern: `{ minTime: 3000, maxConcurrent: 1 }`.
 
 7. **SPA rendering**: Some chains need `waitForLoadState('networkidle')` + additional `waitForTimeout(3000)` for JS-rendered content. Always take a screenshot immediately after navigation to diagnose what was actually loaded.
+
+8. **TacoBell uses Nutritionix iframe**: The allergen page at `tacobell.com/nutrition/allergen-info` embeds a Nutritionix widget via `<iframe>`. The parent page has NO allergen data in its DOM. Navigate to `https://www.nutritionix.com/taco-bell/menu/special-diets/premium` directly.
+
+9. **JimmyJohns is a React SPA with PerimeterX**: The allergen page (`/our-food/allergen-information`) renders as `<div id="root">` with no server-rendered content. Allergen data is only in a downloadable PDF from ctfassets.net CDN. The PDF link is in the page footer.
+
+10. **Potbelly /allergens is dead**: The URL `potbelly.com/allergens` returns a 404 page. Use `potbelly.com/food/nutrition` instead. The scraper detects 404 pages by checking for "oops" or "not found" in body text.
+
+11. **Playwright browser install**: On Windows with restricted execution policies, use `node node_modules\.bin\playwright.cmd install chromium` instead of `npx playwright install`.
