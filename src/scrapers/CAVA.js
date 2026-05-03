@@ -1,46 +1,84 @@
-'use strict';
+﻿'use strict';
 const BaseScraper = require('./BaseScraper');
-const { logger } = require('../utils/logger');
+const PDFScraper  = require('./PDFScraper');
+const { logger }  = require('../utils/logger');
 const { makeEmptyRow, ALLERGENS } = require('../output/schema');
+
 const OFFICIAL_URL = 'https://cava.com/nutrition';
-const ALT_URL = 'https://cava.com/menu';
+const ALT_URL      = 'https://cava.com/menu/nutrition';
+
 const COLUMN_MAP = { 'milk':'milk','dairy':'milk','egg':'eggs','eggs':'eggs','fish':'fish','shellfish':'shellfish','tree nut':'treeNuts','tree nuts':'treeNuts','peanut':'peanuts','peanuts':'peanuts','wheat':'wheat','gluten':'wheat','soy':'soy','soybean':'soy','sesame':'sesame' };
+
 const KNOWN_ITEMS = [
-  { name: 'CAVA Bowl (Greens & Grains)', category: 'Bowls' },
-  { name: 'CAVA Bowl (Pita)', category: 'Bowls' },
-  { name: 'CAVA Bowl (Salad)', category: 'Bowls' },
-  { name: 'Grilled Chicken', category: 'Proteins' },
-  { name: 'Braised Lamb', category: 'Proteins' },
-  { name: 'Falafel', category: 'Proteins' },
-  { name: 'RightRice', category: 'Bases' },
-  { name: 'Brown Lentils', category: 'Bases' },
-  { name: 'Saffron Basmati Rice', category: 'Bases' },
-  { name: 'SuperGreens', category: 'Bases' },
-  { name: 'Harissa Honey Chicken', category: 'Proteins' },
-  { name: 'Spicy Lamb Meatballs', category: 'Proteins' },
-  { name: 'Hummus', category: 'Dips & Spreads' },
-  { name: 'Tzatziki', category: 'Dips & Spreads' },
-  { name: 'Crazy Feta', category: 'Dips & Spreads' },
-  { name: 'Classic Pita', category: 'Pita' },
-  { name: 'Whole Wheat Pita', category: 'Pita' },
+  { name: 'CAVA Bowl (Greens & Grains)',  category: 'Bowls' },
+  { name: 'CAVA Bowl (Pita)',             category: 'Bowls' },
+  { name: 'CAVA Bowl (Salad)',            category: 'Bowls' },
+  { name: 'Grilled Chicken',             category: 'Proteins' },
+  { name: 'Braised Lamb',                category: 'Proteins' },
+  { name: 'Falafel',                     category: 'Proteins' },
+  { name: 'Harissa Honey Chicken',       category: 'Proteins' },
+  { name: 'Spicy Lamb Meatballs',        category: 'Proteins' },
+  { name: 'RightRice',                   category: 'Bases' },
+  { name: 'Brown Lentils',               category: 'Bases' },
+  { name: 'Saffron Basmati Rice',        category: 'Bases' },
+  { name: 'SuperGreens',                 category: 'Bases' },
+  { name: 'Hummus',                      category: 'Dips & Spreads' },
+  { name: 'Tzatziki',                    category: 'Dips & Spreads' },
+  { name: 'Crazy Feta',                  category: 'Dips & Spreads' },
+  { name: 'Classic Pita',                category: 'Pita' },
+  { name: 'Whole Wheat Pita',            category: 'Pita' },
 ];
+
 class CAVA extends BaseScraper {
-  constructor() { super({ chainName: 'CAVA', officialUrl: OFFICIAL_URL }); this._headers = null; }
+  constructor() { super({ chainName: 'CAVA', officialUrl: OFFICIAL_URL }); this._headers = null; this._pdfRows = null; }
 
   async discoverMenuItems() {
+    // Strategy 1: navigate and look for PDF allergen guide link
     let ok = await this.navigateTo(OFFICIAL_URL);
     if (!ok) ok = await this.navigateTo(ALT_URL);
-    if (!ok) { logger.warn('Could not load page — using known items', { chain: this.chainName }); return KNOWN_ITEMS; }
-    try { await this.page.waitForLoadState('networkidle', { timeout: 25000 }); } catch { /* ok */ }
-    await this.page.waitForTimeout(3000);
-    await this.takeScreenshot('nutrition-page');
-    const tableItems = await this._parseTable();
-    if (tableItems.length > 0) { logger.info(`Table parse: ${tableItems.length} items`, { chain: this.chainName }); return tableItems; }
-    const bodyItems = await this._parseBodyText();
-    if (bodyItems.length > 0) return bodyItems;
+    if (ok) {
+      try { await this.page.waitForLoadState('networkidle', { timeout: 25000 }); } catch { /* ok */ }
+      await this.page.waitForTimeout(3000);
+      await this.takeScreenshot('nutrition-page');
+
+      // Look for PDF download link in page
+      const pdfUrl = await this.page.evaluate(() => {
+        const links = Array.from(document.querySelectorAll('a[href]'));
+        for (const link of links) {
+          const href = link.href || '';
+          const text = (link.innerText || link.getAttribute('aria-label') || '').toLowerCase();
+          if ((href.includes('.pdf') || href.includes('ctfassets') || href.includes('download')) &&
+              (text.includes('allergen') || text.includes('nutrition') || href.includes('allergen'))) {
+            return href;
+          }
+        }
+        return null;
+      }).catch(() => null);
+
+      if (pdfUrl) {
+        logger.info(`Found CAVA allergen PDF: ${pdfUrl}`, { chain: this.chainName });
+        const pdfScraper = new PDFScraper({ chainName: this.chainName, pdfUrl, officialUrl: OFFICIAL_URL });
+        const pdfRows = await pdfScraper.scrape();
+        if (pdfRows.length > 0) {
+          logger.info(`PDF parse yielded ${pdfRows.length} rows`, { chain: this.chainName });
+          this._pdfRows = pdfRows;
+          return pdfRows.map(r => ({ name: r.itemName, category: r.menuCategory, _pdfRow: r }));
+        }
+      }
+
+      // Strategy 2: table parse
+      const tableItems = await this._parseTable();
+      if (tableItems.length > 0) { logger.info(`Table parse: ${tableItems.length} items`, { chain: this.chainName }); return tableItems; }
+
+      // Strategy 3: body text
+      const bodyItems = await this._parseBodyText();
+      if (bodyItems.length > 0) return bodyItems;
+    }
+
     logger.warn(`Falling back to ${KNOWN_ITEMS.length} known items`, { chain: this.chainName });
     return KNOWN_ITEMS;
   }
+
   async _parseTable() {
     const data = await this.page.evaluate(() => {
       const tables = Array.from(document.querySelectorAll('table'));
@@ -49,7 +87,7 @@ class CAVA extends BaseScraper {
       const rows = Array.from(best.querySelectorAll('tr'));
       if (rows.length < 2) return null;
       const headers = Array.from(rows[0].querySelectorAll('th,td')).map(c=>(c.innerText||'').trim().toLowerCase());
-      const items = []; let cat = 'Bowls';
+      const items = []; let cat = 'Proteins';
       for (let i = 1; i < rows.length; i++) {
         const cells = Array.from(rows[i].querySelectorAll('td,th'));
         if (!cells.length) continue;
@@ -68,10 +106,11 @@ class CAVA extends BaseScraper {
     if (!data||!data.items.length) return [];
     this._headers = data.headers; return data.items;
   }
+
   async _parseBodyText() {
     const body = await this.page.innerText('body').catch(()=>'');
     const lines = body.split('\n').map(l=>l.trim()).filter(Boolean);
-    const items = []; let cat = 'Bowls'; const seen = new Set();
+    const items = []; let cat = 'Proteins'; const seen = new Set();
     for (const line of lines) {
       const lower = line.toLowerCase();
       if (line.length < 50 && /^[A-Z][A-Z\s&\-\/]+$/.test(line)) { cat = line; continue; }
@@ -80,7 +119,10 @@ class CAVA extends BaseScraper {
     }
     logger.info(`Body text: ${items.length} items`, { chain: this.chainName }); return items;
   }
+
   async extractAllergens(item) {
+    if (item._pdfRow) return item._pdfRow;
+
     const row = makeEmptyRow();
     row.menuCategory = item.category; row.itemName = item.name;
     row.sourceUrl = OFFICIAL_URL; row.scrapeDate = new Date().toISOString();
@@ -92,7 +134,7 @@ class CAVA extends BaseScraper {
     }
     for (const a of ALLERGENS) row[a]='COULD_NOT_VERIFY';
     row.crossContact='COULD_NOT_VERIFY'; row.confidence='COULD_NOT_VERIFY';
-    row.sourceText=`Allergen data not accessible — check ${OFFICIAL_URL}`;
+    row.sourceText='Allergen PDF found on page but not parseable — check cava.com/nutrition';
     return row;
   }
 }

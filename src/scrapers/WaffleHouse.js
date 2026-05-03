@@ -1,4 +1,4 @@
-﻿'use strict';
+'use strict';
 const BaseScraper = require('./BaseScraper');
 const { logger } = require('../utils/logger');
 const { makeEmptyRow, ALLERGENS } = require('../output/schema');
@@ -42,7 +42,9 @@ class WaffleHouse extends BaseScraper {
     if (!ok) ok = await this.navigateTo(ALT_URL);
     if (!ok) { logger.warn('Could not load page — using known items', { chain: this.chainName }); return KNOWN_ITEMS; }
     try { await this.page.waitForLoadState('networkidle', { timeout: 25000 }); } catch { /* ok */ }
-    await this.page.waitForTimeout(3000);
+    await this.page.waitForTimeout(5000);
+    // Wait for JS-rendered content — WaffleHouse renders blank until JS loads
+    try { await this.page.waitForSelector('table, .nutrition-table, [class*="nutrition"], [class*="menu-item"], [class*="allergen"]', { timeout: 10000 }); } catch { /* ok */ }
     await this.takeScreenshot('nutrition-page');
     const tableItems = await this._parseTable();
     if (tableItems.length > 0) { logger.info(`Table parse: ${tableItems.length} items`, { chain: this.chainName }); return tableItems; }

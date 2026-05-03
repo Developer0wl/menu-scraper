@@ -2,7 +2,7 @@
 const BaseScraper = require('./BaseScraper');
 const { logger } = require('../utils/logger');
 const { makeEmptyRow, ALLERGENS } = require('../output/schema');
-const OFFICIAL_URL = 'https://www.noodles.com/allergen-information';
+const OFFICIAL_URL = 'https://www.noodles.com/eatwell';
 const ALT_URL = 'https://www.noodles.com/nutrition';
 const COLUMN_MAP = { 'milk':'milk','dairy':'milk','egg':'eggs','eggs':'eggs','fish':'fish','shellfish':'shellfish','tree nut':'treeNuts','tree nuts':'treeNuts','peanut':'peanuts','peanuts':'peanuts','wheat':'wheat','gluten':'wheat','soy':'soy','soybean':'soy','sesame':'sesame' };
 const KNOWN_ITEMS = [
