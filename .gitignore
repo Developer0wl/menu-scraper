@@ -1,0 +1,20 @@
+node_modules/
+/output/
+logs/
+checkpoints/
+screenshots/
+
+# Debug artifacts
+debug-*.js
+debug-*.html
+debug-*.png
+debug-screenshot.png
+
+# Temp / OS
+.DS_Store
+Thumbs.db
+*.log
+
+# Secrets / env
+.env
+.env.*

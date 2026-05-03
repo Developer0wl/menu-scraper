@@ -1,0 +1,23 @@
+{
+  "name": "allerva-scraper",
+  "version": "1.0.0",
+  "description": "Life-safety allergen scraper for the Allerva platform",
+  "type": "commonjs",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "mcdonalds": "node src/index.js --chain mcdonalds",
+    "dry-run": "node src/index.js --chain mcdonalds --dry-run"
+  },
+  "dependencies": {
+    "bottleneck": "^2.19.5",
+    "commander": "^12.1.0",
+    "exceljs": "^4.4.0",
+    "pdf-parse": "1.1.1",
+    "playwright": "^1.44.0",
+    "winston": "^3.13.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
