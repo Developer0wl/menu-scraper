@@ -1,98 +1,121 @@
 'use strict';
-const BaseScraper = require('./BaseScraper');
+const HybridScraper = require('./HybridScraper');
 const { logger } = require('../utils/logger');
 const { makeEmptyRow, ALLERGENS } = require('../output/schema');
-const OFFICIAL_URL = 'https://blazepizza.com/nutrition';
-const ALT_URL = 'https://blazepizza.com/menu';
-const COLUMN_MAP = { 'milk':'milk','dairy':'milk','egg':'eggs','eggs':'eggs','fish':'fish','shellfish':'shellfish','tree nut':'treeNuts','tree nuts':'treeNuts','peanut':'peanuts','peanuts':'peanuts','wheat':'wheat','gluten':'wheat','soy':'soy','soybean':'soy','sesame':'sesame' };
-const KNOWN_ITEMS = [
-  { name: '11-inch Pizza (Classic Red Sauce)', category: 'Pizza' },
-  { name: 'White Top Pizza', category: 'Pizza' },
-  { name: 'BBQ Chicken Pizza', category: 'Pizza' },
-  { name: 'Green Stripe Pizza', category: 'Pizza' },
-  { name: 'Pizza Marg', category: 'Pizza' },
-  { name: 'The Link Pizza', category: 'Pizza' },
-  { name: 'Meat Eater Pizza', category: 'Pizza' },
-  { name: 'Veg Out Pizza', category: 'Pizza' },
-  { name: 'Art Lover Pizza', category: 'Pizza' },
-  { name: 'Classic Caesar Salad', category: 'Salads' },
-  { name: 'Blaze Salad', category: 'Salads' },
-  { name: 'Rustic Italian Salad', category: 'Salads' },
-  { name: 'Dough (Original)', category: 'Dough' },
-  { name: 'Dough (Gluten-Free)', category: 'Dough' },
-  { name: 'Keto Crust', category: 'Dough' },
-  { name: 'Smore Pie', category: 'Desserts' },
-  { name: 'Cinnamon Roll', category: 'Desserts' },
-];
-class BlazePizza extends BaseScraper {
-  constructor() { super({ chainName: 'BlazePizza', officialUrl: OFFICIAL_URL }); this._headers = null; }
 
-  async discoverMenuItems() {
-    let ok = await this.navigateTo(OFFICIAL_URL);
-    if (!ok) ok = await this.navigateTo(ALT_URL);
-    if (!ok) { logger.warn('Could not load page — using known items', { chain: this.chainName }); return KNOWN_ITEMS; }
-    try { await this.page.waitForLoadState('networkidle', { timeout: 25000 }); } catch { /* ok */ }
-    await this.page.waitForTimeout(3000);
-    await this.takeScreenshot('nutrition-page');
-    const tableItems = await this._parseTable();
-    if (tableItems.length > 0) { logger.info(`Table parse: ${tableItems.length} items`, { chain: this.chainName }); return tableItems; }
-    const bodyItems = await this._parseBodyText();
-    if (bodyItems.length > 0) return bodyItems;
-    logger.warn(`Falling back to ${KNOWN_ITEMS.length} known items`, { chain: this.chainName });
-    return KNOWN_ITEMS;
+const NUTRITIONIX_URL = 'https://www.nutritionix.com/blaze-pizza/nutrition-calculator/premium';
+const OFFICIAL_URL = 'https://blazepizza.com/nutrition';
+
+// Map Nutritionix allergen keys to our schema
+const NX_ALLERGEN_MAP = {
+  milk: 'allergen_contains_Milk',
+  eggs: 'allergen_contains_Eggs',
+  fish: 'allergen_contains_Fish',
+  shellfish: 'allergen_contains_Shellfish',
+  treeNuts: 'allergen_contains_Tree_Nuts',
+  peanuts: 'allergen_contains_Peanuts',
+  wheat: 'allergen_contains_Wheat',
+  soy: 'allergen_contains_Soy',
+  sesame: 'allergen_contains_Sesame'
+};
+
+class BlazePizza extends HybridScraper {
+  constructor() { 
+    super({ chainName: 'BlazePizza', officialUrl: OFFICIAL_URL });
   }
-  async _parseTable() {
-    const data = await this.page.evaluate(() => {
-      const tables = Array.from(document.querySelectorAll('table'));
-      if (!tables.length) return null;
-      const best = tables.reduce((a,b) => b.querySelectorAll('tr').length > a.querySelectorAll('tr').length ? b : a);
-      const rows = Array.from(best.querySelectorAll('tr'));
-      if (rows.length < 2) return null;
-      const headers = Array.from(rows[0].querySelectorAll('th,td')).map(c=>(c.innerText||'').trim().toLowerCase());
-      const items = []; let cat = 'Pizza';
-      for (let i = 1; i < rows.length; i++) {
-        const cells = Array.from(rows[i].querySelectorAll('td,th'));
-        if (!cells.length) continue;
-        const name = (cells[0].innerText||'').trim(); if (!name) continue;
-        if (cells.length <= 1) { cat = name; continue; }
-        const values = cells.slice(1).map(cell => {
-          const txt=(cell.innerText||'').trim().toLowerCase();
-          const icon=!!(cell.querySelector('img,svg,[class*="check"],[class*="icon"]'));
-          const aria=(cell.getAttribute('aria-label')||'').toLowerCase();
-          return (icon||aria.includes('yes')||aria.includes('contain')||(txt&&txt!=='-'&&txt!=='n/a'&&txt!=='no'&&txt.length<6))?'present':'';
-        });
-        items.push({ name, category: cat, _values: values });
-      }
-      return { headers, items };
-    });
-    if (!data||!data.items.length) return [];
-    this._headers = data.headers; return data.items;
-  }
-  async _parseBodyText() {
-    const body = await this.page.innerText('body').catch(()=>'');
-    const lines = body.split('\n').map(l=>l.trim()).filter(Boolean);
-    const items = []; let cat = 'Pizza'; const seen = new Set();
-    for (const line of lines) {
-      const lower = line.toLowerCase();
-      if (line.length < 50 && /^[A-Z][A-Z\s&\-\/]+$/.test(line)) { cat = line; continue; }
-      if (lower.includes('contains')&&(lower.includes('milk')||lower.includes('wheat')||lower.includes('soy')||lower.includes('egg')||lower.includes('sesame')))
-        { const name = line.slice(0,80); if (!seen.has(name)) { seen.add(name); items.push({ name, category: cat, _rawText: line }); } }
+
+  async _discoverViaAPI() {
+    // Navigate directly to the Nutritionix calculator that powers Blaze Pizza
+    const ok = await this.navigateTo(NUTRITIONIX_URL);
+    if (!ok) return null;
+
+    // Wait for the JSON data payload to load
+    const json = await this.waitForApiResponse(/calculator\/.*?\.json/);
+    if (!json || !json.calculator) {
+      logger.warn('Could not intercept Nutritionix API payload', { chain: this.chainName });
+      return null;
     }
-    logger.info(`Body text: ${items.length} items`, { chain: this.chainName }); return items;
+
+    const itemsObj = json.calculator.items || {};
+    const ingredientsObj = json.calculator.ingredients || {};
+    const categoriesObj = json.calculator.categories || {};
+
+    const apiItems = [];
+
+    // Nutritionix separates top-level "items" (which might be templates) and "ingredients" (actual menu items like bases, sauces)
+    // We will extract both to ensure complete coverage, but mainly ingredients since Blaze is a build-your-own model.
+
+    for (const key of Object.keys(ingredientsObj)) {
+      const ing = ingredientsObj[key];
+      if (ing && ing.name) {
+        apiItems.push({
+          name: ing.name.trim(),
+          category: 'Ingredients',
+          _nxData: ing
+        });
+      }
+    }
+
+    // Optional: add pre-built template items
+    for (const key of Object.keys(itemsObj)) {
+      const itm = itemsObj[key];
+      if (itm && itm.name) {
+        // Look up category name if possible
+        const cat = categoriesObj[itm.category_id] ? categoriesObj[itm.category_id].name : 'Pizza';
+        apiItems.push({
+          name: itm.name.trim(),
+          category: cat,
+          _nxData: itm
+        });
+      }
+    }
+
+    return apiItems;
   }
+
   async extractAllergens(item) {
     const row = makeEmptyRow();
-    row.menuCategory = item.category; row.itemName = item.name;
-    row.sourceUrl = OFFICIAL_URL; row.scrapeDate = new Date().toISOString();
-    if (item._rawText) { Object.assign(row, this.parseAllergenText(item._rawText)); if (ALLERGENS.some(a=>row[a]==='TRUE')) return row; }
-    if (item._values && this._headers) {
-      const present = []; let anyMapped = false;
-      this._headers.forEach((header,i) => { const key=COLUMN_MAP[header]; if (!key) return; const isPresent=item._values[i-1]==='present'; if (isPresent) present.push(header); row[key]=isPresent?'TRUE':'FALSE'; anyMapped=true; });
-      if (anyMapped) { row.confidence='HIGH'; row.crossContact='NO'; row.sourceText=present.length>0?`Contains: ${present.join(', ')}`:'No allergens listed'; return row; }
+    row.menuCategory = item.category; 
+    row.itemName = item.name;
+    row.sourceUrl = OFFICIAL_URL; 
+    row.scrapeDate = new Date().toISOString();
+
+    if (!item._nxData) {
+      row.sourceText = 'No API data found';
+      return row;
     }
-    for (const a of ALLERGENS) row[a]='COULD_NOT_VERIFY';
-    row.crossContact='COULD_NOT_VERIFY'; row.confidence='COULD_NOT_VERIFY';
-    row.sourceText=`Allergen data not accessible — check ${OFFICIAL_URL}`;
+
+    const nx = item._nxData;
+    let hasMapped = false;
+    let present = [];
+
+    for (const a of ALLERGENS) {
+      const nxKey = NX_ALLERGEN_MAP[a];
+      const val = nx[nxKey];
+      
+      if (val === 1) {
+        row[a] = 'TRUE';
+        present.push(a);
+        hasMapped = true;
+      } else if (val === 0) {
+        row[a] = 'FALSE';
+        hasMapped = true;
+      } else {
+        // -1 means unknown or not applicable
+        row[a] = 'COULD_NOT_VERIFY';
+      }
+    }
+
+    if (hasMapped) {
+      row.confidence = 'HIGH';
+      row.crossContact = 'NO';
+      row.sourceText = present.length > 0 ? `API Contains: ${present.join(', ')}` : 'API: No allergens indicated';
+    } else {
+      row.confidence = 'COULD_NOT_VERIFY';
+      row.crossContact = 'COULD_NOT_VERIFY';
+      row.sourceText = 'Allergen fields were undefined (-1) in API';
+    }
+
     return row;
   }
 }

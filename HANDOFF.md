@@ -119,19 +119,21 @@ Expected: ~1,100-1,300 total rows, 0 errors. Check logs/validation.log for any r
 
 *Note: CAVA was tested but `PDFScraper` returns all-FALSE due to `pdf-parse` matrix dropping. Moved to P4.*
 
-### P3 — Upgrade CNV chains to TRUE/FALSE
+### P3 — Upgrade CNV chains to TRUE/FALSE (API-First Strategy)
 
-Best candidates (known to have static HTML allergen tables):
+**Architecture Pivot:** Due to the complexity of SPAs (like Blaze Pizza's interactive wizard), manual DOM parsing (clicking through UI elements) is too brittle. We are pivoting to an **API-First Strategy**. For these chains, we will intercept the raw JSON network requests (often from third-party providers like Nutritionix) to extract structured allergen arrays directly.
+
+Best candidates for API-based extraction:
 
 | Chain | Target URL | Approach |
 |-------|-----------|----------|
-| Tim Hortons | timhortons.com/us/en/menu/nutrition.html | Table — may need different URL path |
-| Blaze Pizza | blazepizza.com/nutrition | Ingredient-level allergen page |
-| MOD Pizza | modpizza.com/nutrition | Similar to Blaze |
-| Jersey Mike's | jerseymikes.com/allergens | Has a downloadable allergen PDF |
-| Marco's Pizza | marcos.com/nutrition | Table format |
+| Tim Hortons | timhortons.com/us/en/menu/nutrition.html | Look for internal JSON API powering the menu |
+| Blaze Pizza | blazepizza.com/nutrition | Inspect interactive wizard for hidden JSON endpoint |
+| MOD Pizza | modpizza.com/nutrition | Inspect interactive wizard for hidden JSON endpoint |
+| Jersey Mike's | jerseymikes.com/allergens | Investigate API or SPA state for allergen data |
+| Marco's Pizza | marcos.com/nutrition | Investigate API for table data |
 
-To upgrade a chain: add live table-parse logic, test with `--chain X --dry-run`, confirm rows show TRUE/FALSE.
+To upgrade a chain: Identify the API endpoint, add network interception logic (or direct `fetch()`), and test with `--chain X --dry-run` to confirm rows show TRUE/FALSE.
 
 ### P4 — Fix PDF chains
 

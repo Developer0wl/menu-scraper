@@ -144,6 +144,30 @@ class BaseScraper {
     }
   }
 
+  // ─── API Interception ───────────────────────────────────────────────────────
+
+  /**
+   * Waits for a specific API response matching the URL pattern and returns its JSON.
+   * Useful for extracting data from SPAs without parsing the DOM.
+   * @param {RegExp|string} urlPattern - The URL or regex to match.
+   * @param {number} timeout - Timeout in milliseconds (default 15000).
+   * @returns {Promise<Object|null>} Parsed JSON response or null on timeout.
+   */
+  async waitForApiResponse(urlPattern, timeout = 15000) {
+    try {
+      logger.debug(`Waiting for API response matching: ${urlPattern}`, { chain: this.chainName });
+      const response = await this.page.waitForResponse(res => {
+        const url = res.url();
+        return typeof urlPattern === 'string' ? url.includes(urlPattern) : urlPattern.test(url);
+      }, { timeout });
+      const json = await response.json();
+      return json;
+    } catch (err) {
+      logger.warn(`API interception timed out or failed: ${err.message}`, { chain: this.chainName });
+      return null;
+    }
+  }
+
   // ─── Screenshots ──────────────────────────────────────────────────────────
 
   async takeScreenshot(label) {
