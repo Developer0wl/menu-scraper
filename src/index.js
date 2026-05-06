@@ -7,6 +7,27 @@ const { logger, validationLogger } = require('./utils/logger');
 const checkpoint = require('./checkpoint');
 const ExcelWriter = require('./output/ExcelWriter');
 const { ALLERGENS, VALID_VALUES } = require('./output/schema');
+const AIScraper = require('./scrapers/AIScraper');
+
+// ── AI pilot set — Tier 3 chains upgraded via ScrapeGraphAI ────────────────
+// Activate with: node src/index.js --chain blazepizza --use-ai
+// Requires: pip install -r requirements.txt && playwright install chromium (Python)
+// Set env: GROQ_API_KEY (default provider) or OPENAI_API_KEY or start Ollama
+// URL status as of 2026-05-05:
+//   chipotle    ✅ VALIDATED — 26 items, correct TRUE/FALSE data
+//   blazepizza  ⚠️  SPA wizard — allergen data requires user interaction, AI gets 0 rows
+//   modpizza    ⚠️  SPA wizard — same as blazepizza
+//   jerseymikes ❌  /allergens is 404 — URL needs updating
+//   marcospizza ❓  not yet tested
+//   timhortons  ❓  encoding issues on first test, retry needed
+const AI_CHAINS = {
+  chipotle:    { chainName: 'Chipotle',    officialUrl: 'https://www.chipotle.com/allergens' },
+  blazepizza:  { chainName: 'BlazePizza',  officialUrl: 'https://www.blazepizza.com/nutrition' },
+  modpizza:    { chainName: 'MODPizza',    officialUrl: 'https://modpizza.com/nutrition' },
+  jerseymikes: { chainName: 'JerseyMikes', officialUrl: 'https://www.jerseymikes.com/menu' },
+  marcospizza: { chainName: 'MarcosPizza', officialUrl: 'https://marcos.com/nutrition' },
+  timhortons:  { chainName: 'TimHortons',  officialUrl: 'https://www.timhortons.com/us/en/menu/nutrition.html' },
+};
 
 // ── Registry of all chain scrapers ─────────────────────────────────────────
 // Remaining scrapers are stubs — add implementations before running --all
@@ -79,6 +100,7 @@ program
   .option('--resume',           'Skip chains that already have a checkpoint file')
   .option('--dry-run',          'Extract and log data but do not write Excel output')
   .option('--validate',         'Re-validate existing output without re-scraping')
+  .option('--use-ai',           'Use ScrapeGraphAI for supported Tier 3 chains (see AI_CHAINS in index.js)')
   .parse(process.argv);
 
 const opts = program.opts();
@@ -180,6 +202,7 @@ async function runChain(chainKey, writer, dryRun, resume) {
 async function main() {
   const dryRun = !!opts.dryRun;
   const resume = !!opts.resume;
+  const useAI  = !!opts.useAi;
 
   // Determine which chains to run
   let chainsToRun = [];
@@ -192,6 +215,16 @@ async function main() {
   } else {
     logger.error('No chain specified. Use --all, --chain <name>, or --chains <a,b,c>');
     process.exit(1);
+  }
+
+  // Inject AI scrapers for any chain in the pilot set when --use-ai is active
+  if (useAI) {
+    for (const [key, config] of Object.entries(AI_CHAINS)) {
+      if (chainsToRun.includes(key)) {
+        SCRAPERS[key] = () => new AIScraper(config);
+        logger.info(`AI scraper enabled for: ${key}`, {});
+      }
+    }
   }
 
   logger.info(`Allerva scraper starting`, {
