@@ -20,8 +20,8 @@ const BaseScraper = require('./BaseScraper');
 const { logger }  = require('../utils/logger');
 const { makeEmptyRow, ALLERGENS } = require('../output/schema');
 
-const OFFICIAL_URL  = 'https://www.jerseymikes.com/menu/nutrition';
-const ALLERGEN_URL  = 'https://www.jerseymikes.com/menu/nutrition';
+const OFFICIAL_URL  = 'https://www.jerseymikes.com/menu/food-allergy';
+const NUTRITION_URL = 'https://www.jerseymikes.com/menu/nutrition';
 
 const COLUMN_MAP = {
   'milk':       'milk',
@@ -76,9 +76,10 @@ class JerseyMikes extends BaseScraper {
   }
 
   async discoverMenuItems() {
-    const ok = await this.navigateTo(OFFICIAL_URL);
+    let ok = await this.navigateTo(OFFICIAL_URL);
+    if (!ok) ok = await this.navigateTo(NUTRITION_URL);
     if (!ok) {
-      logger.warn('Could not load nutrition page — using known items', { chain: this.chainName });
+      logger.warn('Could not load allergen page — using known items', { chain: this.chainName });
       return KNOWN_ITEMS;
     }
 
@@ -197,7 +198,7 @@ class JerseyMikes extends BaseScraper {
     for (const a of ALLERGENS) row[a] = 'COULD_NOT_VERIFY';
     row.crossContact = 'COULD_NOT_VERIFY';
     row.confidence   = 'COULD_NOT_VERIFY';
-    row.sourceText   = 'Allergen data not accessible via HTML — check jerseymikes.com/menu/nutrition';
+    row.sourceText   = 'Allergen data not accessible via HTML — check jerseymikes.com/menu/food-allergy';
     return row;
   }
 }

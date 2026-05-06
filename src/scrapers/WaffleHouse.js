@@ -3,8 +3,12 @@ const BaseScraper = require('./BaseScraper');
 const { logger } = require('../utils/logger');
 const { makeEmptyRow, ALLERGENS } = require('../output/schema');
 
-const OFFICIAL_URL = 'https://www.wafflehouse.com/nutrition';
-const ALT_URL = 'https://www.wafflehouse.com/menu';
+const OFFICIAL_URL  = 'https://www.wafflehouse.com/nutrition';
+const ALT_URLS      = [
+  'https://www.wafflehouse.com/breakfast-nutritionals/',
+  'https://www.wafflehouse.com/lunch-and-dinner-nutritionals/',
+];
+const ALLERGEN_PDF  = 'https://www.wafflehouse.com/wp-content/uploads/FoodAllergensPoster.2.2023.pdf';
 const COLUMN_MAP = { 'milk':'milk','dairy':'milk','egg':'eggs','eggs':'eggs','fish':'fish','shellfish':'shellfish','tree nut':'treeNuts','tree nuts':'treeNuts','peanut':'peanuts','peanuts':'peanuts','wheat':'wheat','gluten':'wheat','soy':'soy','soybean':'soy','sesame':'sesame' };
 const KNOWN_ITEMS = [
   { name: 'Waffle',                        category: 'Waffles' },
@@ -38,18 +42,20 @@ class WaffleHouse extends BaseScraper {
   constructor() { super({ chainName: 'WaffleHouse', officialUrl: OFFICIAL_URL }); this._headers = null; }
 
   async discoverMenuItems() {
-    let ok = await this.navigateTo(OFFICIAL_URL);
-    if (!ok) ok = await this.navigateTo(ALT_URL);
-    if (!ok) { logger.warn('Could not load page — using known items', { chain: this.chainName }); return KNOWN_ITEMS; }
-    try { await this.page.waitForLoadState('networkidle', { timeout: 25000 }); } catch { /* ok */ }
-    await this.page.waitForTimeout(5000);
-    // Wait for JS-rendered content — WaffleHouse renders blank until JS loads
-    try { await this.page.waitForSelector('table, .nutrition-table, [class*="nutrition"], [class*="menu-item"], [class*="allergen"]', { timeout: 10000 }); } catch { /* ok */ }
-    await this.takeScreenshot('nutrition-page');
-    const tableItems = await this._parseTable();
-    if (tableItems.length > 0) { logger.info(`Table parse: ${tableItems.length} items`, { chain: this.chainName }); return tableItems; }
-    const bodyItems = await this._parseBodyText();
-    if (bodyItems.length > 0) return bodyItems;
+    // Try main nutrition page first, then sub-pages
+    const urlsToTry = [OFFICIAL_URL, ...ALT_URLS];
+    for (const url of urlsToTry) {
+      const ok = await this.navigateTo(url);
+      if (!ok) continue;
+      try { await this.page.waitForLoadState('networkidle', { timeout: 25000 }); } catch { /* ok */ }
+      await this.page.waitForTimeout(5000);
+      try { await this.page.waitForSelector('table, .nutrition-table, [class*="nutrition"], [class*="allergen"]', { timeout: 10000 }); } catch { /* ok */ }
+      await this.takeScreenshot(`nutrition-${url.split('/').filter(Boolean).pop()}`);
+      const tableItems = await this._parseTable();
+      if (tableItems.length > 0) { logger.info(`Table parse from ${url}: ${tableItems.length} items`, { chain: this.chainName }); return tableItems; }
+      const bodyItems = await this._parseBodyText();
+      if (bodyItems.length > 0) return bodyItems;
+    }
     logger.warn(`Falling back to ${KNOWN_ITEMS.length} known items`, { chain: this.chainName });
     return KNOWN_ITEMS;
   }
@@ -108,7 +114,7 @@ class WaffleHouse extends BaseScraper {
     }
     for (const a of ALLERGENS) row[a]='COULD_NOT_VERIFY';
     row.crossContact='COULD_NOT_VERIFY'; row.confidence='COULD_NOT_VERIFY';
-    row.sourceText='Allergen data not accessible — check wafflehouse.com/nutrition';
+    row.sourceText=`Allergen data not accessible — check wafflehouse.com/nutrition or allergen PDF: ${ALLERGEN_PDF}`;
     return row;
   }
 }

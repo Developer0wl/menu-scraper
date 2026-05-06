@@ -21,7 +21,7 @@ const Bottleneck  = require('bottleneck');
 const { logger }  = require('../utils/logger');
 const { makeEmptyRow, ALLERGENS } = require('../output/schema');
 
-const OFFICIAL_URL    = 'https://www.pandaexpress.com/usca/en/allergens';
+const OFFICIAL_URL    = 'https://www.pandaexpress.com/nutritioninformation';
 const ALLERGEN_PDF    = 'https://www.pandaexpress.com/content/dam/pandaexpress/nutritional_and_allergen_info.pdf';
 const MENU_URL        = 'https://www.pandaexpress.com/menu';
 
@@ -155,9 +155,9 @@ class PandaExpress extends BaseScraper {
 
   async _tryAllergenPage() {
     const URLS = [
+      'https://www.pandaexpress.com/nutritioninformation',
       'https://www.pandaexpress.com/allergens',
       'https://www.pandaexpress.com/usca/en/allergens',
-      'https://www.pandaexpress.com/nutrition',
     ];
 
     for (const url of URLS) {
@@ -293,7 +293,7 @@ class PandaExpress extends BaseScraper {
     for (const a of ALLERGENS) row[a] = 'COULD_NOT_VERIFY';
     row.crossContact = 'COULD_NOT_VERIFY';
     row.confidence   = 'COULD_NOT_VERIFY';
-    row.sourceText   = `Bot-blocked on HTML allergen page. Allergen PDF: ${ALLERGEN_PDF}`;
+    row.sourceText   = `Allergen page not accessible — check pandaexpress.com/nutritioninformation. PDF: ${ALLERGEN_PDF}`;
     return row;
   }
 }

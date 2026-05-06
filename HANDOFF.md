@@ -100,6 +100,23 @@ Live-testing showed:
 
 ---
 
+## URL Audit (Updated 2026-05-06)
+
+Verified current allergen/nutrition URLs for all problem chains:
+
+| Chain | Old URL (broken) | New/Correct URL | Status |
+|-------|-----------------|-----------------|--------|
+| Jersey Mike's | `/allergens` (404) | `jerseymikes.com/menu/food-allergy` | ✅ Fixed in scraper |
+| In-N-Out Burger | `/docs/nutritional_info.pdf` (dead) | `/docs/default-source/downloads/in-n-out_allergen_info.pdf` | ✅ Fixed in scraper |
+| Panda Express | `/usca/en/allergens` (bot-blocked) | `pandaexpress.com/nutritioninformation` | ✅ Fixed in scraper |
+| Potbelly | `/food/nutrition` (redirects) | `potbelly.com/nutrition-calculator` | ✅ Fixed in scraper |
+| WaffleHouse | `/nutrition` (JS blank) | `/nutrition` + sub-pages + allergen PDF | ✅ Fixed in scraper |
+| NoodlesAndCompany | `/allergen-information` (redirects) | `noodles.com/eatwell` (alt: `/eat-well`) | ✅ Fixed in scraper |
+| Raising Cane's | PDF (403 blocked) | `raisingcanes.com/allergens/` HTML page | ⚠️ Try HTML with longer wait |
+| Wingstop | PDF (local copy) | Possible new PDF: S3 URL (see P4) | ⚠️ Needs column map fix |
+
+---
+
 ## What Needs to Be Done (Priority Order)
 
 ### P1 — Set up Python AI sidecar and run pilot chains (NEW — Session 5)
@@ -159,8 +176,12 @@ Expected: ~1,100-1,300 total rows, 0 errors. Check logs/validation.log for any r
 
 | Chain | Issue | Fix |
 |-------|-------|-----|
-| NoodlesAndCompany | URL redirects to homepage | ✅ Fixed: URL updated to `/eatwell`, 18 rows parsed with TRUE/FALSE. |
-| WaffleHouse | JS-rendered, blank after load | ✅ Fixed: Added `waitForSelector`, 25 rows parsed with TRUE/FALSE. |
+| NoodlesAndCompany | URL redirects to homepage | ✅ Fixed: URL updated to `/eatwell` (alt: `/eat-well`), 18 rows parsed with TRUE/FALSE. |
+| WaffleHouse | JS-rendered, blank after load | ✅ Fixed: Added `waitForSelector`, now also tries sub-pages `/breakfast-nutritionals/` and `/lunch-and-dinner-nutritionals/`. Has allergen PDF at `wafflehouse.com/wp-content/uploads/FoodAllergensPoster.2.2023.pdf`. |
+| JerseyMikes | `/allergens` was 404 | ✅ Fixed: Now uses `https://www.jerseymikes.com/menu/food-allergy` as primary URL, `/menu/nutrition` as fallback. |
+| InNOutBurger | Old PDF URL dead | ✅ Fixed: New PDF URL `https://www.in-n-out.com/docs/default-source/downloads/in-n-out_allergen_info.pdf`. HTML page at `/menu/nutrition-info`. |
+| PandaExpress | `/usca/en/allergens` bot-blocked | ✅ Fixed: Now uses `https://www.pandaexpress.com/nutritioninformation` as primary URL. |
+| Potbelly | `/food/nutrition` redirects | ✅ Fixed: Now uses `https://www.potbelly.com/nutrition-calculator` as primary URL. |
 
 *Note: CAVA was tested but `PDFScraper` returns all-FALSE due to `pdf-parse` matrix dropping. Moved to P4.*
 
@@ -187,6 +208,7 @@ The generic `PDFScraper` loses column position info for checkmark/X-matrix PDFs.
 **Wingstop** (`screenshots/Wingstop/allergen-source.pdf`):
 Column order: `Wheat | Dairy | Egg | Soy | Fish/Shellfish | Mustard | Celery`
 Peanuts/TreeNuts = FALSE (not used as ingredients).
+A potential newer PDF URL: `https://s3.amazonaws.com/wingstop.com/assets/static/WS_Allergens_8.21.25.pdf`
 
 **CAVA** (`screenshots/CAVA/allergen-source.pdf`):
 Matrix parsing drops column positions. Needs manual map.
@@ -194,11 +216,13 @@ Matrix parsing drops column positions. Needs manual map.
 **Whataburger** (`screenshots/Whataburger/allergen-source.pdf`):
 URL returns PDF directly. Matrix parsing drops column positions. Needs manual map.
 
-**In-N-Out**: Old PDF URL is dead. Visit `https://www.in-n-out.com/nutrition` and find the current allergen PDF link, then update `src/scrapers/InNOutBurger.js`.
+**In-N-Out**: ✅ PDF URL updated in scraper.
+New PDF: `https://www.in-n-out.com/docs/default-source/downloads/in-n-out_allergen_info.pdf`
+HTML page: `https://www.in-n-out.com/menu/nutrition-info`
 
-**Raising Cane's**: PDF 403 blocked even with Playwright. Try using `--save-header` trick or check if there's an HTML version at `raisingcanes.com/food/nutrition`.
+**Raising Cane's**: HTML allergen page at `https://www.raisingcanes.com/allergens/` is the recommended approach (not PDF). The page is a Gatsby SPA — try network interception or waitForSelector with longer timeout.
 
-**Panda Express**: All known URLs 403/404. Try the mobile API: check Network tab for `api.pandaexpress.com` requests when visiting the site.
+**Panda Express**: ✅ URL updated in scraper. New URL: `https://www.pandaexpress.com/nutritioninformation` (replaces the bot-blocked `/usca/en/allergens`). Try this page with a longer wait — it may have a static table.
 
 ### P5 — Produce final Excel output
 

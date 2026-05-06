@@ -21,7 +21,7 @@ const { logger }  = require('../utils/logger');
 const { makeEmptyRow, ALLERGENS } = require('../output/schema');
 
 const OFFICIAL_URL    = 'https://www.in-n-out.com/menu/nutrition-info';
-const ALLERGEN_PDF    = 'https://www.in-n-out.com/docs/nutritional_info.pdf';
+const ALLERGEN_PDF    = 'https://www.in-n-out.com/docs/default-source/downloads/in-n-out_allergen_info.pdf';
 
 // In-N-Out menu is famously small and hasn't changed in decades
 const KNOWN_ITEMS = [

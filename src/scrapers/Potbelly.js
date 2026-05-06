@@ -16,10 +16,10 @@ const BaseScraper = require('./BaseScraper');
 const { logger }  = require('../utils/logger');
 const { makeEmptyRow, ALLERGENS } = require('../output/schema');
 
-const OFFICIAL_URL = 'https://www.potbelly.com/food/nutrition';
+const OFFICIAL_URL = 'https://www.potbelly.com/nutrition-calculator';
 const ALT_URLS     = [
+  'https://www.potbelly.com/food/nutrition',
   'https://www.potbelly.com/menu',
-  'https://www.potbelly.com/food',
 ];
 
 const COLUMN_MAP = {
@@ -277,7 +277,7 @@ class Potbelly extends BaseScraper {
     for (const a of ALLERGENS) row[a] = 'COULD_NOT_VERIFY';
     row.crossContact = 'COULD_NOT_VERIFY';
     row.confidence   = 'COULD_NOT_VERIFY';
-    row.sourceText   = 'Potbelly allergen page no longer exists — check potbelly.com/food/nutrition';
+    row.sourceText   = 'Potbelly allergen data not accessible — check potbelly.com/nutrition-calculator';
     return row;
   }
 }
