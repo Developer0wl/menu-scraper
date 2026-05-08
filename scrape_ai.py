@@ -314,13 +314,46 @@ def _parse_allergen_table_direct(pdf_path: str, source_url: str) -> list:
         "ss": "sesame",
     }
 
-    # Layout C column order (offset 0-8 from merged allergen header cell).
-    # Empirically validated on Bojangles 2024 nutrition guide PDF; the order is
+    # Layout C column order — Bojangles-specific fallback (empirically validated).
     # Egg, Fish, Milk, Peanut, Sesame, Soy, Shellfish, Wheat, TreeNuts.
     LAYOUT_C_ORDER = [
         "eggs", "fish", "milk", "peanuts", "sesame",
         "soy", "shellfish", "wheat", "treeNuts",
     ]
+
+    def _parse_merged_header_order(header_text: str) -> list:
+        """Parse merged allergen header cell text into ordered list of allergen key groups.
+        Returns a list of lists: each element is one or more allergen keys for that column.
+        Combined columns (e.g. 'Fish / Shellfish') produce a 2-element list.
+        Non-schema allergens (Celery, Corn, etc.) are represented as [].
+        """
+        import re as _rh
+        text = _rh.sub(r'\*+', ' ', header_text.lower())
+        COL_PATTERNS = [
+            (r'fish\s*/\s*shellfish|shellfish\s*/\s*fish', ['fish', 'shellfish']),
+            (r'treenut[s]?\s*/\s*peanuts?|tree\s*nuts?\s*/\s*peanuts?|peanuts?\s*/\s*tree\s*nuts?', ['treeNuts', 'peanuts']),
+            (r'tree\s*nuts?|treenut[s]?', ['treeNuts']),
+            (r'peanuts?', ['peanuts']),
+            (r'shellfish|crustacean', ['shellfish']),
+            (r'fish', ['fish']),
+            (r'wheat|gluten', ['wheat']),
+            (r'dairy|milk', ['milk']),
+            (r'eggs?', ['eggs']),
+            (r'soy', ['soy']),
+            (r'sesame', ['sesame']),
+            (r'celery|corn|sulfite|legume|onion|mushroom|mustard', []),
+        ]
+        consumed: set = set()
+        matches = []
+        for pattern, keys in COL_PATTERNS:
+            for m in _rh.finditer(pattern, text):
+                span = set(range(m.start(), m.end()))
+                if span & consumed:
+                    continue
+                consumed |= span
+                matches.append((m.start(), keys))
+        matches.sort()
+        return [keys for _, keys in matches]
 
     def parse_allergen_text(text: str) -> dict:
         """Parse allergen text in two modes:
@@ -439,10 +472,13 @@ def _parse_allergen_table_direct(pdf_path: str, source_url: str) -> list:
                         if not row or not any(row):
                             continue
                         item_name = ((row[name_col] if name_col < len(row) else None) or "").strip()
+                        # Fix common PDF font ligature encoding (e.g. Darden fi/fl ligatures)
+                        item_name = item_name.replace('ﬁ', 'fi').replace('ﬂ', 'fl').replace('ï¬', 'fi')
                         if not item_name or len(item_name) > 120:
                             continue
                         if cat_col is not None:
                             cat_cell = (row[cat_col] or "").strip()
+                            cat_cell = cat_cell.replace('ﬁ', 'fi').replace('ﬂ', 'fl').replace('ï¬', 'fi')
                             if cat_cell and not any(row[c] for c in allergen_cols if c < len(row)):
                                 current_category = cat_cell
                                 continue
@@ -479,33 +515,59 @@ def _parse_allergen_table_direct(pdf_path: str, source_url: str) -> list:
                         break
 
                 if layout_c_col is not None:
+                    # Determine allergen column order from merged header text (forward or reversed)
+                    merged_cell_text = (table[layout_c_header_ri][layout_c_col] or "").lower()
+                    lc_actual_order = None
+                    for try_text in (merged_cell_text, merged_cell_text[::-1]):
+                        parsed = _parse_merged_header_order(try_text)
+                        if len(parsed) >= 6:
+                            lc_actual_order = parsed
+                            break
+                    if not lc_actual_order:
+                        lc_actual_order = [[k] for k in LAYOUT_C_ORDER]
+
                     current_category = "Menu"
+                    lc_carry_name = None  # carry-forward for col-0 when None (2-col item names)
                     for row in table[layout_c_header_ri + 1:]:
                         if not row or not any(row):
                             continue
-                        item_name = ((row[0] if row else None) or "").strip()
+                        # Item name: support 2-col layout (col 0 = category, col 1 = variant)
+                        raw0 = ((row[0] if row else None) or "").strip()
+                        raw1 = ((row[1] if len(row) > 1 else None) or "").strip() if layout_c_col >= 2 else ""
+                        raw0 = raw0.replace('\n', ' ').strip()
+                        if raw0:
+                            lc_carry_name = raw0
+                        base_name = lc_carry_name or raw0
+                        item_name = (f"{base_name} - {raw1}" if raw1 else base_name).strip()
+                        item_name = item_name.replace('ﬁ', 'fi').replace('ﬂ', 'fl').replace('ï¬', 'fi')
                         if not item_name or len(item_name) > 120:
                             continue
                         allergen_cells = [
                             (row[layout_c_col + off] if layout_c_col + off < len(row) else "") or ""
-                            for off in range(9)
+                            for off in range(len(lc_actual_order))
                         ]
                         all_empty = all(not c.strip() for c in allergen_cells)
-                        if all_empty and item_name.isupper():
+                        if all_empty and item_name.isupper() and not raw1:
                             current_category = item_name
+                            lc_carry_name = None
                             continue
                         allergen_data: dict[str, str] = {}
                         has_any = False
-                        for off, ak in enumerate(LAYOUT_C_ORDER):
+                        for off, ak_group in enumerate(lc_actual_order):
+                            if not ak_group:
+                                continue  # skip non-schema column
                             cell = allergen_cells[off]
                             if cell_is_positive(cell):
-                                allergen_data[ak] = "TRUE"
+                                for ak in ak_group:
+                                    allergen_data[ak] = "TRUE"
                                 has_any = True
                             elif cell_is_negative(cell):
-                                allergen_data[ak] = "FALSE"
+                                for ak in ak_group:
+                                    allergen_data[ak] = "FALSE"
                                 has_any = True
                             else:
-                                allergen_data[ak] = "COULD_NOT_VERIFY"
+                                for ak in ak_group:
+                                    allergen_data[ak] = "COULD_NOT_VERIFY"
                         if not has_any:
                             continue
                         r = make_row(item_name, current_category, allergen_data, source_url)
@@ -553,6 +615,80 @@ def _parse_allergen_table_direct(pdf_path: str, source_url: str) -> list:
                     allergen_data = parse_allergen_text(allergen_cell)
                     r = make_row(item_name, current_category, allergen_data, source_url)
                     rows.append(r)
+
+    # ── Layout D: text-position X-mark table (no PDF table cells) ──────────────
+    # Used for PDFs where extract_tables() finds nothing but text has a header row
+    # with allergen column names and subsequent rows with 'X' markers aligned by
+    # x-coordinate (e.g. P.F. Chang's 2026 allergen matrix).
+    if not rows:
+        XMARK_HDR = {
+            'wheat': 'wheat', 'soy': 'soy', 'milk': 'milk',
+            'egg': 'eggs', 'eggs': 'eggs', 'fish': 'fish',
+            'shellfish': 'shellfish', 'peanuts': 'peanuts', 'peanut': 'peanuts',
+            'sesame': 'sesame',
+        }
+        with pdfplumber.open(pdf_path) as pdf_d:
+            for page in pdf_d.pages:
+                words_d = page.extract_words() or []
+                if not words_d:
+                    continue
+                lines_d: dict[int, list] = {}
+                for w in words_d:
+                    yk = round(w['top'] / 3) * 3
+                    lines_d.setdefault(yk, []).append(w)
+                sorted_lines_d = sorted(lines_d.items())
+
+                hdr_y_d = None
+                col_x_d: dict[int, str] = {}
+                prev_tree = False
+                for yk, lw in sorted_lines_d:
+                    lw_lower = [w['text'].lower() for w in lw]
+                    if sum(1 for t in lw_lower if t in XMARK_HDR or t in ('tree', 'nuts')) >= 4:
+                        hdr_y_d = yk
+                        for w in lw:
+                            t = w['text'].lower()
+                            if t == 'tree':
+                                prev_tree = True
+                                continue
+                            if t == 'nuts' and prev_tree:
+                                col_x_d[int(w['x0'])] = 'treeNuts'
+                                prev_tree = False
+                                continue
+                            prev_tree = False
+                            if t in XMARK_HDR:
+                                col_x_d[int(w['x0'])] = XMARK_HDR[t]
+                        break
+
+                if hdr_y_d is None or len(col_x_d) < 4:
+                    continue
+
+                col_xs_d = sorted(col_x_d.keys())
+                current_cat_d = 'Menu'
+
+                for yk, lw in sorted_lines_d:
+                    if yk <= hdr_y_d:
+                        continue
+                    x_marks_d = [w for w in lw if w['text'] == 'X']
+                    name_words_d = [w for w in lw if w['text'] != 'X']
+                    if not name_words_d:
+                        continue
+                    nm_d = ' '.join(w['text'] for w in name_words_d).strip()
+                    nm_d = nm_d.replace('ﬁ', 'fi').replace('ﬂ', 'fl').replace('ï¬', 'fi')
+                    if not x_marks_d and nm_d == nm_d.upper() and len(name_words_d) <= 6:
+                        current_cat_d = nm_d
+                        continue
+                    if not nm_d or len(nm_d) > 120:
+                        continue
+                    ad: dict[str, str] = {}
+                    for xm in x_marks_d:
+                        xp = int(xm['x0'])
+                        best = min(col_xs_d, key=lambda c: abs(c - xp))
+                        if abs(best - xp) < 25:
+                            ad[col_x_d[best]] = 'TRUE'
+                    for key in col_x_d.values():
+                        if key not in ad:
+                            ad[key] = 'FALSE'
+                    rows.append(make_row(nm_d, current_cat_d, ad, pdf_path))
 
     # Re-number rows
     for i, r in enumerate(rows):

@@ -462,6 +462,65 @@ del allerva-scraper\checkpoints\chipotle.json   # if you want AI to re-run chipo
 - **FiveGuys** — Original HIGH-confidence PDF checkpoint (32 rows) was overwritten by a failed AI run. Re-run with `node src/index.js --chain fiveguys` (no `--use-ai`) to restore.
 - **Tim Hortons** — Re-run completed 2026-05-07 → 312 rows, 447 TRUE cells. ✅
 
+### Session 8 — Layout C/D Upgrades + 8 Chain Fixes (2026-05-08)
+
+**Summary:** Upgraded the AI sidecar with two new layout parsers, fixed 8 chains that had 0-row or stale checkpoints using corrected PDF URLs, and documented the remaining permanently blocked/data-quality chains.
+
+**scrape_ai.py changes:**
+
+| Change | Details |
+|--------|---------|
+| **Layout C — dynamic merged header** | Replaced hardcoded Bojangles column order with `_parse_merged_header_order()` which regex-parses merged header cell text into an ordered list of allergen key groups. Handles combined columns (Fish/Shellfish → both keys set TRUE/FALSE together; Treenut/Peanut → same). Falls back to original LAYOUT_C_ORDER if <6 allergens parsed. Backward-compatible: Bojangles still yields 136 rows. |
+| **Layout C — 2-column item names** | Added `lc_carry_name` to carry forward col-0 item name when col-0 is blank in subsequent rows (Wingstop format where item name spans 2 cols). Item name formatted as `"{base} - {variant}"` when col-1 has text. |
+| **Layout D (new)** | Text-position X-mark parser for PDFs with no table cells (e.g. P.F. Chang's 2026 matrix). Uses `page.extract_words()`, groups words by quantized y-coordinate (3px buckets), finds a header row with ≥4 allergen keywords, builds a col-x → allergen_key map, then for each data row assigns TRUE to allergens whose column x-coordinate is within 25px of an 'X' word. Non-standard allergens (Corn, Sulfites, Legume, Onion, Mushroom) are recognised and ignored. |
+| **Fi-ligature fix** | Added `item_name.replace('ﬁ', 'fi').replace('ﬂ', 'fl').replace('ï¬', 'fi')` in Layout A item-name extraction, Layout A category extraction, Layout C path, and Layout D path. Fixes partial ligature encoding in some Darden PDFs. |
+| **`_parse_merged_header_order` helper** | Standalone function after LAYOUT_C_ORDER. Uses regex with span-based deduplication to map allergen keyword spans to key lists. Handles "Tree Nuts", "Treenut", "Tree Nut", combined "Fish / Shellfish" and "Treenut/Peanut" patterns. Non-schema allergens (Celery, Corn, etc.) map to `[]` and are skipped during data extraction. |
+
+**src/index.js URL changes (AI_CHAINS):**
+
+| Chain | Old URL | New URL | Reason |
+|-------|---------|---------|--------|
+| `longhornsteakhouse` | `longhorn_allergen_guide.pdf` | same (reverted) | HTML at `full-menu/nutrition` returned 0 chars (bot-blocked); PDF kept |
+| `veggiegrill` | `VG%20Nutrition%20Info_4.6.24.pdf` (nutrition-only) | GetBento `AAV%202.0%20Allergen%20Guide%2012.25.pdf` | Switched to allergen-specific Dec 2025 PDF |
+| `pfchangs` | `pfchangs.com/nutrition` (HTML, 0 rows) | `pfc-national-menu-allergens-2026.pdf` | HTML page has no extractable allergen table |
+| `fiveguys` | dam URL returning 404 | `wp-content/uploads/2025/07/five-guys-us-nutrition-allergen-guide-english-1-final.pdf` | Fresh Jul 2025 PDF |
+| `wingstop` | `wingstop.com/downloads/pdf/menu/allergen.pdf` (fake PDF serving HTML) | `s3.amazonaws.com/.../WS_Allergens_8.21.25.pdf` | Only real PDF source found |
+| `subway` | `US_Allergen_chart.pdf` | `us_allergens_eng_1-21-25.pdf` | Cleaner Jan 2025 format |
+
+**Results:**
+
+| Chain | Status | Rows | TRUE | Confidence | Notes |
+|-------|--------|------|------|-----------|-------|
+| pfchangs | DONE-PDF | 174 | 162 | HIGH | Layout D text-X; 14 allergen columns (9 in schema) |
+| fiveguys | DONE-PDF | 94 | 70 | HIGH | Jul 2025 allergen guide; "Contains:" format |
+| veggiegrill | DONE-PDF | 91 | 86 | HIGH | GetBento Dec 2025 allergen guide |
+| wingstop | DONE-PDF | 71 | 63 | HIGH | S3 PDF; Layout C dynamic order with combined Fish/Shellfish, Treenut/Peanut |
+| bojangles | re-run | 136 | 140 | HIGH | Layout C backward-compat confirmed (was 134) |
+| tgifridays | DONE-PDF | 220 | 729 | HIGH | May 2025 wp-content PDF (was 15-row LOW AI run) |
+| sweetgreen | DONE-PDF | 126 | 19 | MIXED | ctfassets nutrition binder; 28 CNV |
+| qdoba | DONE-PDF | 28 | 25 | HIGH | ctfassets allergen guide |
+| justsalad | DONE-PDF | 118 | 4 | MIXED | Jun 2024 allergen PDF; 4 TRUE correct (greens are allergen-free) |
+
+**Still blocked / data-quality:**
+
+| Chain | Reason | Status |
+|-------|--------|--------|
+| longhornsteakhouse | Darden custom font encodes ALL chars as fi-ligature (U+FB01); `ï¬` is the entire item name — not recoverable with text substitution | DATA-ISSUE |
+| subway | Jan 2025 PDF uses vertical/rotated column headers encoded as newline-separated reversed strings (e.g. `'g\ng\nE'` = "Egg"); `normalize_header()` can't match; LLM fallback hit Groq 100k daily TPD cap | BLOCKED |
+| texasroadhouse | 403 on all paths | BLOCKED |
+| whitecastle | All candidate PDFs crash pdfplumber (likely scanned images) | BLOCKED |
+| deltaco | JS SPA; no static allergen PDF accessible | BLOCKED |
+| marcospizza | Nutritionix interactive calculator (paid API) | BLOCKED |
+| bjsrestaurants | Allergen guides page is JS-rendered; Scene7 PDF is nutrition-only | BLOCKED |
+| hardees | All getmedia PDF URLs return 403 | BLOCKED |
+| roundtablepizza | 186 rows all-FALSE — graphical image checkboxes; pdfplumber reads blank cells | DATA-ISSUE |
+| whataburger | 35 rows all-FALSE — matrix parse broken | DATA-ISSUE |
+| cava | 1 row — matrix parse broken | DATA-ISSUE |
+| teriyakimadness | 30 rows mostly FALSE/CNV — text-positioned PDF, no extractable tables | DATA-ISSUE |
+
+**Possible future fix for Subway (not yet implemented):**
+In `normalize_header()`, if `'\n' in s`, try `''.join(reversed(s.replace('\n','')))` — this would decode rotated vertical-text headers. Would also need to raise Layout A column-detection threshold or handle the 12-column format.
+
 ---
 
 ## Complete Chain Registry (53 chains)

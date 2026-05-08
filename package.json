@@ -10,6 +10,7 @@
     "dry-run": "node src/index.js --chain mcdonalds --dry-run"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.105.3",
     "bottleneck": "^2.19.5",
     "commander": "^12.1.0",
     "exceljs": "^4.4.0",
