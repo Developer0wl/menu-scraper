@@ -13,6 +13,8 @@ class ExcelWriter {
     this.workbook.creator = 'Allerva Scraper';
     this.workbook.created = new Date();
     this._chainSummaries = [];
+    // Pre-create summary sheet so it is always sheet 1 (ExcelJS has no moveSheet API)
+    this._summarySheet = this.workbook.addWorksheet('Verification Summary');
   }
 
   /**
@@ -107,8 +109,7 @@ class ExcelWriter {
    * Must be called AFTER all chain sheets are added.
    */
   addSummarySheet() {
-    const sheet = this.workbook.addWorksheet('Verification Summary');
-    this.workbook.moveSheet('Verification Summary', 0); // put it first
+    const sheet = this._summarySheet; // already at position 0 (pre-created in constructor)
 
     const headers = ['Chain', 'Items Discovered', 'Items Extracted',
                      'TRUE Count', 'FALSE Count', 'CNV Count', 'Status', 'Scrape Date'];

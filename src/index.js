@@ -10,23 +10,54 @@ const { ALLERGENS, VALID_VALUES } = require('./output/schema');
 const AIScraper = require('./scrapers/AIScraper');
 
 // ── AI pilot set — Tier 3 chains upgraded via ScrapeGraphAI ────────────────
-// Activate with: node src/index.js --chain blazepizza --use-ai
+// Activate with: node src/index.js --chain <key> --use-ai
 // Requires: pip install -r requirements.txt && playwright install chromium (Python)
 // Set env: GROQ_API_KEY (default provider) or OPENAI_API_KEY or start Ollama
-// URL status as of 2026-05-05:
-//   chipotle    ✅ VALIDATED — 26 items, correct TRUE/FALSE data
-//   blazepizza  ⚠️  SPA wizard — allergen data requires user interaction, AI gets 0 rows
-//   modpizza    ⚠️  SPA wizard — same as blazepizza
-//   jerseymikes ❌  /allergens is 404 — URL needs updating
-//   marcospizza ❓  not yet tested
-//   timhortons  ❓  encoding issues on first test, retry needed
+// blazepizza + timhortons use their own HybridScraper natively — NOT listed here
 const AI_CHAINS = {
-  chipotle:    { chainName: 'Chipotle',    officialUrl: 'https://www.chipotle.com/allergens' },
-  blazepizza:  { chainName: 'BlazePizza',  officialUrl: 'https://www.blazepizza.com/nutrition' },
-  modpizza:    { chainName: 'MODPizza',    officialUrl: 'https://modpizza.com/nutrition' },
-  jerseymikes: { chainName: 'JerseyMikes', officialUrl: 'https://www.jerseymikes.com/menu' },
-  marcospizza: { chainName: 'MarcosPizza', officialUrl: 'https://marcos.com/nutrition' },
-  timhortons:  { chainName: 'TimHortons',  officialUrl: 'https://www.timhortons.com/us/en/menu/nutrition.html' },
+  // Validated ✅
+  chipotle:           { chainName: 'Chipotle',            officialUrl: 'https://www.chipotle.com/allergens' },
+  jerseymikes:        { chainName: 'JerseyMikes',         officialUrl: 'https://www.jerseymikes.com/menu/food-allergy' },
+  marcospizza:        { chainName: 'MarcosPizza',         officialUrl: 'https://www.marcos.com/nutrition' },
+
+  // Bucket A — static HTML (AI scraper)
+  longhornsteakhouse: { chainName: 'LongHornSteakhouse',  officialUrl: 'https://media.longhornsteakhouse.com/en_us/pdf/nutrition_allergen_guide.pdf' },
+  crackerbarrel:      { chainName: 'CrackerBarrel',       officialUrl: 'https://www.crackerbarrel.com/-/media/Project/cb-brandsite/brandsite/pdfs/AllergenGuide.pdf' },
+  texasroadhouse:     { chainName: 'TexasRoadhouse',      officialUrl: 'https://www.texasroadhouse.com/nutritional-information' },
+  littlecaesars:      { chainName: 'LittleCaesars',       officialUrl: 'https://littlecaesars.com/static/usnutritionguide.pdf' },
+  zaxbys:             { chainName: 'Zaxbys',              officialUrl: 'https://www.zaxbys.com/uploads/2023_P1_Zaxbys_NAI_Guide_Digital_d804127ec6.pdf' },
+  smashburger:        { chainName: 'Smashburger',         officialUrl: 'https://www.smashburger.com/menu/nutrition' },
+  whitecastle:        { chainName: 'WhiteCastle',         officialUrl: 'https://www.whitecastle.com/pdfs/nutrition/WEBSITE%20NUTRITIONAL%20-2%2002.16.22.pdf' },
+  carlsjr:            { chainName: 'CarlsJr',             officialUrl: 'https://www.carlsjr.com/getContentAsset/86ac3f5e-5c97-4a18-9e27-7a6d62a9148f/dfc3d011-8f63-43f6-9ed8-4b444333a1d0/cj-25w5-sys_np-dig-1120x3000_r0.pdf?language=en-US' },
+  hardees:            { chainName: 'Hardees',             officialUrl: 'https://www.hardees.com/getmedia/c71a87a7-8a11-475e-b3d5-b22ece7b8b2b/HD-24W3-SYS_NP-0012_Cropped_r0.pdf' },
+  steak_n_shake:      { chainName: 'SteakNShake',         officialUrl: 'https://cos-steak-n-shake.s3.us-west-2.amazonaws.com/production/wp-content/uploads/2025/05/06185649/SNS_National-_May2025_No_Price.pdf' },
+  bojangles:          { chainName: 'Bojangles',           officialUrl: 'https://storyblok.pleinaircdn.com/f/110020/x/6da88a04c9/nutrition-guide-updated-v2_2-8-24.pdf' },
+  moes:               { chainName: 'MoesSouthwestGrill',  officialUrl: 'https://assets.ctfassets.net/zqt8tllj2cy0/3Mh9GkDGVQcrIzQUpCyspY/200f37e957b84ee8079d54a5863dce51/Moes-Allergen-Chart-20250228-V2.pdf' },
+  deltaco:            { chainName: 'DelTaco',             officialUrl: 'https://deltaco.com/files/pdf/2024/allergens-07-2024.pdf' },
+  roundtablepizza:    { chainName: 'RoundTablePizza',     officialUrl: 'https://koala-configurations.s3.us-east-1.amazonaws.com/public/assets/allergen-information-10-6-22-marketing-production-2920.pdf' },
+  jamba:              { chainName: 'Jamba',               officialUrl: 'https://assets.ctfassets.net/zqt8tllj2cy0/6QMmAUCCRZGEeFYHyZDPOs/fdb40483a66ef64dc61c438e2e80b556/Jamba_Nutrition_Spreadsheet_-_May_2026-1.pdf' },
+  tgifridays:         { chainName: 'TGIFridays',          officialUrl: 'https://tgifridays.com/wp-content/uploads/2025/05/TGI-Fridays-SYSTEM-ANI-Document-May-2025-Rollout-sent-05.07.2025.pdf' },
+  goldencorral:       { chainName: 'GoldenCorral',        officialUrl: 'https://www.goldencorral.com/nutrition/' },
+  bjsrestaurants:     { chainName: 'BJsRestaurants',      officialUrl: 'https://bjsrestaurants.scene7.com/is/content/bjsrestaurants/0924_BJS_NUTRI_92425pdf' },
+  yardhouse:          { chainName: 'YardHouse',           officialUrl: 'https://media.yardhouse.com/en_us/pdf/Nutrition_Dietary_Allergen_Guide.pdf' },
+  veggiegrill:        { chainName: 'VeggieGrill',         officialUrl: 'https://media-cdn.getbento.com/accounts/0879d48e96f07deb9c3248ba98650536/media/8bZYDfc2Q4mY44qC1X25_VG%20Nutrition%20Info_4.6.24.pdf' },
+  freshii:            { chainName: 'Freshii',             officialUrl: 'https://freshii.com/wp-content/uploads/2025/08/Freshii-N_A-Guide-2025-V2.2-EN.pdf' },
+  justsalad:          { chainName: 'JustSalad',           officialUrl: 'https://cdn1.justsalad.com/public/Just_Salad_Allergen_Guide_JUN24.pdf' },
+  teriyakimadness:    { chainName: 'TeriyakiMadness',     officialUrl: 'https://teriyakimadness.com/wp-content/uploads/2025/04/TMAD_Allergen-Chart_2025.pdf' },
+  tropicalsmoothie:   { chainName: 'TropicalSmoothieCafe', officialUrl: 'https://www.tropicalsmoothiecafe.com/nutrition' },
+  peiwei:             { chainName: 'PeiWei',              officialUrl: 'https://www.peiwei.com/nutrition' },
+  pfchangs:           { chainName: 'PFChangs',            officialUrl: 'https://www.pfchangs.com/nutrition' },
+  jimmyjohns:         { chainName: 'JimmyJohns',          officialUrl: 'https://resources.jimmyjohns.com/downloadable-files/JimmyJohnsAllergenInformation.pdf' },
+  bobevans:           { chainName: 'BobEvans',            officialUrl: 'https://assets.ctfassets.net/81w9kb7f1jq4/3XhvWxXW7Mo7JNOfBzWVB2/88c78d1621ffe9ab7c9007db49ef7f74/Allergens_SpringFY20.pdf' },
+  fiveguys:           { chainName: 'FiveGuys',            officialUrl: 'https://www.fiveguys.com/content/dam/fiveguys/NutritionalAllergen/Five-Guys-Allergen-Information.pdf' },
+
+  // Wingstop + Subway — PDF direct links (no bot protection on PDF server)
+  wingstop:           { chainName: 'Wingstop',            officialUrl: 'https://s3.amazonaws.com/wingstop.com/assets/static/WS_Allergens_8.21.25.pdf' },
+  subway:             { chainName: 'Subway',              officialUrl: 'https://www.subway.com/-/media/USA/Documents/Nutrition/US_Allergen_chart.pdf' },
+
+  // Bucket B — HybridScraper now live for MODPizza; Sweetgreen/Qdoba still intercepting
+  sweetgreen:         { chainName: 'Sweetgreen',          officialUrl: 'https://assets.ctfassets.net/eum7w7yri3zr/7qzNkzyPBQBya7k1CdhWqg/09492fe3cff02335d09d4a552136eff3/Nutrition_Overview_P5_24__1_.pdf' },
+  qdoba:              { chainName: 'Qdoba',               officialUrl: 'https://www.qdoba.com/public/assets/documents/qdoba-allergen-information.pdf' },
 };
 
 // ── Registry of all chain scrapers ─────────────────────────────────────────

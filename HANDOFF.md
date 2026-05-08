@@ -1,6 +1,6 @@
 # Allerva Scraper — Project Handoff
 
-Last updated: 2026-05-05  
+Last updated: 2026-05-07  
 Repository: https://github.com/Developer0wl/menu-scraper  
 Handed off to: antigravity
 
@@ -423,6 +423,44 @@ del allerva-scraper\checkpoints\chipotle.json   # if you want AI to re-run chipo
 **Tier 1 Promotions:**
 *   **Blaze Pizza**: Moved from Tier 3 (CNV) to Tier 1 (Live API).
 *   **Tim Hortons**: Moved from Tier 3 (CNV) to Tier 1 (Live API).
+
+### Session 7 — AI Batch Rollout + Bug Fixes (2026-05-07)
+
+**Summary:** Ran AI sidecar on all 31 PENDING chains. 19 chains now have TRUE allergen data.
+12 chains remain BLOCKED. 3 chains have DATA-ISSUE quality problems.
+
+**Detailed Modification Log:**
+
+*   **scrape_ai.py — Layout C (merged allergen header):** Bojangles' PDF uses a single merged cell spanning 9 allergen sub-columns with all allergen names written as reversed/rotated text. Detection: ≥5 allergen keywords in forward or reversed cell text + ≥4 empty trailing cells. Empirically validated column order (offsets 0–8): Egg, Fish, Milk, Peanut, Sesame, Soy, Shellfish, Wheat, TreeNuts. Result: 134 rows, 140 TRUE cells, HIGH confidence.
+
+*   **scrape_ai.py — PDF URL detection fix:** Changed from `re.search(r'\.pdf($|\?|#)')` to `urlparse(url).path.rstrip('/').lower().endswith('pdf')` to handle CDN URLs without a `.pdf` extension (e.g. BJ's scene7 URL ending in `92425pdf`).
+
+*   **scrape_ai.py — MAX_PDF_CHARS 16000 → 5500:** Groq free tier is 12k TPM. Dense PDF table rows run ~1.45 tokens/char. At 5,500 chars + ~1,800 token prompt ≈ 9,775 tokens total (safe under 12k limit). Chains requesting >12k tokens previously returned 413 errors.
+
+*   **src/output/ExcelWriter.js — moveSheet bug fix:** ExcelJS has no `moveSheet()` API — calling it threw `TypeError: this.workbook.moveSheet is not a function`. Fixed by pre-creating the summary worksheet in the constructor so it is always at index 0 by insertion order.
+
+*   **src/index.js — AI_CHAINS expanded:** Added PDF URLs for `jimmyjohns` (JimmyJohnsAllergenInformation.pdf), `bobevans` (Allergens_SpringFY20.pdf), `tropicalsmoothie` (cloudfront PDF), `bjsrestaurants` (scene7 PDF), `veggiegrill` (GetBento PDF). Note: bjsrestaurants and veggiegrill PDFs are nutrition-only (no allergen columns) — both return 0 rows until allergen-specific PDFs are found.
+
+*   **blazepizza.json checkpoint replaced:** Stale 0-row checkpoint from a previous failed run was deleted. Re-ran native HybridScraper (Nutritionix API) → 276 rows, 339 TRUE cells saved.
+
+**Results summary:**
+
+| Outcome | Count | Chains |
+|---------|-------|--------|
+| DONE-AI (new) | 12 | jamba(276), yardhouse(195), carlsjr(131), freshii(126), crackerbarrel(105), moes(41), littlecaesars(46), peiwei(34), steak_n_shake(15), tgifridays(15), zaxbys(11), chipotle(existing) |
+| DONE-PDF (new) | 4 | bojangles(134), jimmyjohns(60), bobevans(22), tropicalsmoothie(2) |
+| DONE-LIVE (updated) | 1 | blazepizza (276, was stale 0) |
+| BLOCKED | 12 | bjsrestaurants, deltaco, hardees, marcospizza, modpizza, pfchangs, qdoba, subway, sweetgreen, texasroadhouse, veggiegrill, whitecastle |
+| DATA-ISSUE | 3 | longhornsteakhouse (all-FALSE), roundtablepizza (graphical checkboxes), teriyakimadness (text-positioned) |
+
+**Known issues / next steps:**
+- **BJ's Restaurants** — Scene7 PDF is nutrition-only. Find allergen-specific PDF on bjsrestaurants.com.
+- **VeggieGrill** — GetBento PDF is nutrition-only. Find allergen-specific PDF on veggiegrill.com.
+- **Round Table Pizza** — 186 rows all-FALSE; pdfplumber cannot read graphical/image checkboxes. Needs OCR or alternative data source.
+- **LongHorn Steakhouse** — 39 rows all-FALSE (confidence=HIGH). Re-run to confirm; if still all-FALSE, mark BLOCKED.
+- **Teriyaki Madness** — 30 rows mostly FALSE/CNV; PDF uses text-positioned layout (0 pdfplumber tables), Unicode ✓ present but not reliably parsed.
+- **FiveGuys** — Original HIGH-confidence PDF checkpoint (32 rows) was overwritten by a failed AI run. Re-run with `node src/index.js --chain fiveguys` (no `--use-ai`) to restore.
+- **Tim Hortons** — Re-run completed 2026-05-07 → 312 rows, 447 TRUE cells. ✅
 
 ---
 
