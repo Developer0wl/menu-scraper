@@ -1,7 +1,7 @@
 # Allerva Scraper — Chain Progress
 
-Last updated: 2026-05-08
-Total chains: 53 | Done (any TRUE data): 28 | Checkpoints exist: 53 | BLOCKED (0 rows): 7
+Last updated: 2026-05-11
+Total chains: 53 | Done (any TRUE data): 30 | Checkpoints exist: 53 | BLOCKED (0 rows): 7
 
 ## Legend
 
@@ -33,8 +33,8 @@ Total chains: 53 | Done (any TRUE data): 28 | Checkpoints exist: 53 | BLOCKED (0
 | einsteinbros | Einstein Bros | DONE-CNV | 25 | CNV | CNV | |
 | tacobell | Taco Bell | DONE-CNV | 31 | CNV | CNV | Nutritionix iframe |
 | redrobin | Red Robin | DONE-CNV | 29 | CNV | CNV | |
-| innoutburger | In-N-Out | DONE-CNV | 20 | CNV | CNV | |
-| noodlesandcompany | Noodles & Co | DONE-CNV | 18 | CNV | CNV | |
+| innoutburger | In-N-Out | DONE-AI | 11 | MIXED | Gemini 2.5 Flash PDF | 7 TRUE; in-n-out.com allergen PDF |
+| noodlesandcompany | Noodles & Co | DONE-AI | 58 | HIGH | Gemini 2.5 Flash PDF | 45 TRUE; noodles.com Mar 2026 nutritionals |
 | wafflehouse | Waffle House | DONE-CNV | 25 | CNV | CNV | |
 | cava | CAVA | DONE-CNV | 1 | CNV | PDF | Matrix parse broken |
 | whataburger | Whataburger | DATA-ISSUE | 35 | — | PDF | All-FALSE; matrix parse broken |
@@ -78,13 +78,23 @@ Total chains: 53 | Done (any TRUE data): 28 | Checkpoints exist: 53 | BLOCKED (0
 
 | Chain | Reason |
 |-------|--------|
-| subway | Vertical-text PDF headers confuse direct parser; LLM daily token cap hit; HTML is PerimeterX-blocked |
+| subway | Vertical-text PDF headers confuse direct parser; PerimeterX on HTML |
 | texasroadhouse | Website returns 403 on all paths |
 | whitecastle | All candidate PDFs crash pdfplumber (likely scanned images) |
 | deltaco | JS SPA; no static allergen PDF accessible |
 | marcospizza | Nutritionix interactive calculator (paid API) |
-| bjsrestaurants | Allergen guides page JS-rendered; only PDF found is nutrition-only |
+| bjsrestaurants | Allergen guides page JS-rendered; Scene7 PDF is nutrition-only |
 | hardees | All getmedia PDF URLs return 403 |
+| tacobell | Nutritionix iframe + HTTP/2 bot protection on HTML allergen page |
+| raisingcanes | Gatsby SPA; 0 content rendered |
+| pandaexpress | Bot-blocked HTML (0 chars rendered); no accessible allergen PDF |
+| redrobin | Interactive allergen menu tool only; nutritional PDF inaccessible |
+| firehousesubs | Interactive nutritional tool only; no allergen PDF |
+| potbelly | Interactive nutrition calculator only; no current allergen PDF |
+| smashburger | No official allergen PDF; interactive tool only |
+| goldencorral | Buffet with search-based tool; no static allergen data |
+| einsteinbros | Nutrition guide PDFs only (no allergen columns); interactive tool only |
+| wafflehouse | Image poster PDF (not parseable); full nutritionals PDF has no allergen columns |
 
 ## Data Quality Issues (require OCR or different source)
 

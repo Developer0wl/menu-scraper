@@ -7,8 +7,8 @@ const { logger } = require('../utils/logger');
 const { makeEmptyRow, ALLERGENS } = require('../output/schema');
 
 const SIDECAR = path.resolve(__dirname, '..', '..', 'scrape_ai.py');
-const PROVIDER = process.env.AI_PROVIDER || 'groq';
-const MODEL    = process.env.AI_MODEL    || 'llama-3.3-70b-versatile';
+const PROVIDER = process.env.AI_PROVIDER || 'gemini';
+const MODEL    = process.env.AI_MODEL    || 'gemini-2.5-flash';
 const TIMEOUT  = 180_000; // 3 min — LLM + browser render can be slow
 
 // Resolve the Python executable.

@@ -58,6 +58,19 @@ const AI_CHAINS = {
   // Bucket B — HybridScraper now live for MODPizza; Sweetgreen/Qdoba still intercepting
   sweetgreen:         { chainName: 'Sweetgreen',          officialUrl: 'https://assets.ctfassets.net/eum7w7yri3zr/7qzNkzyPBQBya7k1CdhWqg/09492fe3cff02335d09d4a552136eff3/Nutrition_Overview_P5_24__1_.pdf' },
   qdoba:              { chainName: 'Qdoba',               officialUrl: 'https://assets.ctfassets.net/0tc4847zqy12/7tWiboNUIeUEUPTSgoTufu/ae51f412127293706bcdd6515ad898eb/Allergen-Guide-Published-on-04-23-2024-QDOBA-Mexican-Eats.pdf' },
+
+  // Session 9 — CNV chain fixes (PDF where available, HTML fallback)
+  innoutburger:       { chainName: 'InNOutBurger',        officialUrl: 'https://www.in-n-out.com/docs/default-source/downloads/in-n-out_allergen_info.pdf' },
+  einsteinbros:       { chainName: 'EinsteinBros',        officialUrl: 'https://www.einsteinbros.com/wp-content/uploads/2026/02/Einstein-Bros-Bagels-Nutrition-Guide-2026.pdf' },
+  wafflehouse:        { chainName: 'WaffleHouse',         officialUrl: 'https://www.wafflehouse.com/wp-content/uploads/2024/03/Waffle_House_Full-Nutritionals_-v20.2-7.17.19.pdf' },
+  noodlesandcompany:  { chainName: 'NoodlesAndCompany',   officialUrl: 'https://www.noodles.com/sites/default/files/2026-03/NTR_0326_r3.pdf' },
+  firehousesubs:      { chainName: 'FirehouseSubs',       officialUrl: 'https://www.firehousesubs.com/nutritional-information' },
+  redrobin:           { chainName: 'RedRobin',            officialUrl: 'https://www.redrobin.com/sites/default/files/2023-12/0124_NS_US-ALL.pdf' },
+  potbelly:           { chainName: 'Potbelly',            officialUrl: 'https://www.potbelly.com/nutrition-calculator' },
+  smashburger:        { chainName: 'Smashburger',         officialUrl: 'https://smashburger.com/eat/nutrition-allergen/' },
+  pandaexpress:       { chainName: 'PandaExpress',        officialUrl: 'https://www.pandaexpress.com/nutritioninformation' },
+  raisingcanes:       { chainName: 'RaisingCanes',        officialUrl: 'https://www.raisingcanes.com/allergens/' },
+  tacobell:           { chainName: 'TacoBell',            officialUrl: 'https://www.tacobell.com/nutrition/allergens' },
 };
 
 // ── Registry of all chain scrapers ─────────────────────────────────────────

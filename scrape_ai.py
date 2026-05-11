@@ -14,7 +14,8 @@ Setup:
   playwright install chromium          # Python playwright (separate from Node.js)
 
 Environment variables (set whichever provider you use):
-  GROQ_API_KEY    — for --provider groq  (default, fast + cheap)
+  GEMINI_API_KEY  — for --provider gemini (default, 1M tokens/day free)
+  GROQ_API_KEY    — for --provider groq
   OPENAI_API_KEY  — for --provider openai
   OLLAMA_BASE_URL — for --provider ollama (default: http://localhost:11434)
 """
@@ -56,6 +57,25 @@ Rules:
 
 
 def build_config(provider: str, model: str) -> dict:
+    if provider == "gemini":
+        api_key = os.environ.get("GEMINI_API_KEY", "")
+        if not api_key:
+            print(
+                json.dumps({"error": "GEMINI_API_KEY environment variable not set"}),
+                file=sys.stderr,
+            )
+            sys.exit(1)
+        return {
+            "llm": {
+                "api_key": api_key,
+                "model": f"google_genai/{model}",
+                "model_tokens": 1_000_000,
+            },
+            "model_tokens": 1_000_000,
+            "verbose": False,
+            "headless": True,
+        }
+
     if provider == "groq":
         api_key = os.environ.get("GROQ_API_KEY", "")
         if not api_key:
@@ -727,9 +747,8 @@ def scrape_pdf(pdf_url: str, provider: str, model: str) -> list:
         print("[allerva-ai] PDF has no extractable text (image-based?)", file=sys.stderr)
         return []
 
-    # Fit token budget: Groq free tier 12k TPM; input must stay under ~11k tokens
-    # Dense PDF table rows run ~1.45 tokens/char; 5.5k chars + ~1.8k prompt ≈ 9.8k total
-    MAX_PDF_CHARS = 5_500
+    # Token budget: Gemini has 1M context; Groq free tier caps at ~11k tokens
+    MAX_PDF_CHARS = 80_000 if provider == "gemini" else 5_500
     if len(pdf_text) > MAX_PDF_CHARS:
         pdf_text = pdf_text[:MAX_PDF_CHARS]
         print(f"[allerva-ai] PDF content truncated to {MAX_PDF_CHARS:,} chars", file=sys.stderr)
@@ -737,7 +756,14 @@ def scrape_pdf(pdf_url: str, provider: str, model: str) -> list:
     # Call LLM directly via langchain
     full_prompt = EXTRACTION_PROMPT + "\n\nPAGE CONTENT:\n" + pdf_text
 
-    if provider == "groq":
+    if provider == "gemini":
+        from langchain_google_genai import ChatGoogleGenerativeAI
+        llm = ChatGoogleGenerativeAI(
+            google_api_key=os.environ.get("GEMINI_API_KEY", ""),
+            model=model,
+            max_output_tokens=8192,
+        )
+    elif provider == "groq":
         from langchain_groq import ChatGroq
         llm = ChatGroq(api_key=os.environ.get("GROQ_API_KEY", ""), model_name=model, max_tokens=8192)
     elif provider == "openai":
@@ -779,7 +805,7 @@ def fetch_rendered_html(url: str) -> str:
       - Truncated to MAX_CHARS to stay within Groq free tier (12k TPM ≈ 40k chars)
     Falls back to the URL string on failure so ScrapeGraphAI can try its own fetch.
     """
-    MAX_CHARS = 20_000  # ~8k tokens — safely fits Groq free tier 12k TPM (content+prompt+response)
+    MAX_CHARS = 80_000  # Gemini 2.0 Flash handles 1M tokens; Groq was limited to 20k
 
     try:
         from playwright.sync_api import sync_playwright
@@ -846,14 +872,14 @@ def main():
     parser.add_argument("--url", required=True, help="Allergen/nutrition page URL")
     parser.add_argument(
         "--provider",
-        default="groq",
-        choices=["groq", "openai", "ollama"],
-        help="LLM provider (default: groq)",
+        default="gemini",
+        choices=["gemini", "groq", "openai", "ollama"],
+        help="LLM provider (default: gemini — 1M tokens/day free)",
     )
     parser.add_argument(
         "--model",
-        default="llama-3.3-70b-versatile",
-        help="Model name (default: llama-3.3-70b-versatile for Groq — 12k TPM free tier)",
+        default="gemini-2.5-flash",
+        help="Model name (default: gemini-2.5-flash; use llama-3.3-70b-versatile for groq)",
     )
     args = parser.parse_args()
 
