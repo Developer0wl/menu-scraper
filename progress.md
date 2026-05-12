@@ -1,7 +1,7 @@
 # Allerva Scraper — Chain Progress
 
 Last updated: 2026-05-11
-Total chains: 53 | Done (any TRUE data): 41 | Checkpoints exist: 53 | BLOCKED (0 rows): 7
+Total chains: 53 | Done (any TRUE data): 33 | Checkpoints exist: 53 | BLOCKED (0 rows): 7
 
 ## Legend
 
@@ -27,19 +27,19 @@ Total chains: 53 | Done (any TRUE data): 41 | Checkpoints exist: 53 | BLOCKED (0
 | fiveguys | Five Guys | DONE-PDF | 94 | HIGH | AIScraper PDF | Jul 2025 allergen guide; 70 rows TRUE |
 | subway | Subway | BLOCKED | 0 | — | — | Vertical-text headers; LLM rate-limited; PerimeterX on HTML |
 | jimmyjohns | Jimmy John's | DONE-PDF | 60 | MIXED | PDF | JimmyJohnsAllergenInformation.pdf |
-| jerseymikes | Jersey Mike's | DONE-AI | 16 | HIGH | Perplexity import | 14 TRUE; SafeBite Mar 2026 |
-| firehousesubs | Firehouse Subs | DONE-AI | 17 | HIGH | Perplexity import | 16 TRUE; SafeBite Mar 2026 |
-| potbelly | Potbelly | DONE-AI | 16 | HIGH | Perplexity import | 15 TRUE; SafeBite Mar 2026 |
-| einsteinbros | Einstein Bros | DONE-AI | 15 | HIGH | Perplexity import | 14 TRUE; SafeBite Mar 2026 |
-| tacobell | Taco Bell | DONE-AI | 29 | HIGH | Perplexity import | 25 TRUE; SafeBite Mar 2026 |
-| redrobin | Red Robin | DONE-AI | 19 | HIGH | Perplexity import | 18 TRUE; SafeBite Mar 2026 |
+| jerseymikes | Jersey Mike's | DONE-CNV | 20 | CNV | CNV | Perplexity data unverified — reverted |
+| firehousesubs | Firehouse Subs | DONE-CNV | 16 | CNV | CNV | Perplexity data wrong (only wheat) — reverted |
+| potbelly | Potbelly | DONE-CNV | 33 | CNV | CNV | Perplexity data unverified — reverted |
+| einsteinbros | Einstein Bros | DONE-AI | 15 | HIGH | Perplexity import | 14 TRUE; SafeBite Mar 2026 (partially real) |
+| tacobell | Taco Bell | DONE-CNV | 31 | CNV | CNV | Perplexity data inferred from recipe knowledge — reverted |
+| redrobin | Red Robin | DONE-AI | 19 | MIXED | Perplexity import | 18 TRUE; SafeBite Mar 2026 (partial — missing Eggs/Soy on burgers) |
 | innoutburger | In-N-Out | DONE-AI | 11 | MIXED | Gemini 2.5 Flash PDF | 7 TRUE; in-n-out.com allergen PDF |
 | noodlesandcompany | Noodles & Co | DONE-AI | 58 | HIGH | Gemini 2.5 Flash PDF | 45 TRUE; noodles.com Mar 2026 nutritionals |
-| wafflehouse | Waffle House | DONE-AI | 15 | HIGH | Perplexity import | 12 TRUE; SafeBite Mar 2026 |
+| wafflehouse | Waffle House | DONE-CNV | 25 | CNV | CNV | Perplexity data inferred — reverted |
 | cava | CAVA | DONE-CNV | 1 | CNV | PDF | Matrix parse broken |
 | whataburger | Whataburger | DATA-ISSUE | 35 | — | PDF | All-FALSE; matrix parse broken |
-| pandaexpress | Panda Express | DONE-AI | 18 | HIGH | Perplexity import | 17 TRUE; SafeBite Mar 2026 |
-| raisingcanes | Raising Cane's | DONE-AI | 9 | HIGH | Perplexity import | 7 TRUE; SafeBite Mar 2026 |
+| pandaexpress | Panda Express | DONE-CNV | 24 | CNV | CNV | Perplexity data clearly wrong (zero allergens on Beijing Beef) — reverted |
+| raisingcanes | Raising Cane's | DONE-CNV | 6 | CNV | CNV | Perplexity data inferred from SVG table — reverted |
 | longhornsteakhouse | LongHorn Steakhouse | DATA-ISSUE | 43 | — | AIScraper PDF | Custom font encoding; all item names garbled (fi-ligature) |
 | crackerbarrel | Cracker Barrel | DONE-AI | 105 | MIXED | AIScraper HTML | 165 TRUE / 105 CNV |
 | texasroadhouse | Texas Roadhouse | BLOCKED | 0 | — | — | Bot-protected (403) |
@@ -48,7 +48,7 @@ Total chains: 53 | Done (any TRUE data): 41 | Checkpoints exist: 53 | BLOCKED (0
 | zaxbys | Zaxby's | DONE-AI | 11 | MIXED | AIScraper HTML | Sparse (milkshakes only extracted) |
 | modpizza | MOD Pizza | DONE-LIVE | 83 | HIGH | HTML scraper | modpizza.com/allergen/ static table; 64 TRUE / 0 CNV |
 | pfchangs | P.F. Chang's | DONE-PDF | 174 | HIGH | AIScraper PDF | 2026 allergen matrix; Layout D text-X; 162 TRUE |
-| smashburger | Smashburger | DONE-AI | 16 | HIGH | Perplexity import | 16 TRUE; SafeBite Mar 2026 |
+| smashburger | Smashburger | DONE-CNV | 21 | CNV | CNV | Perplexity data suspicious (cheeseburgers missing Milk) — reverted |
 | whitecastle | White Castle | BLOCKED | 0 | — | — | All PDFs crash sidecar (likely scanned images) |
 | carlsjr | Carl's Jr. | DONE-AI | 131 | HIGH | AIScraper HTML | 229 TRUE / 0 CNV |
 | hardees | Hardee's | BLOCKED | 0 | — | — | All getmedia PDF URLs return 403 |
@@ -62,7 +62,7 @@ Total chains: 53 | Done (any TRUE data): 41 | Checkpoints exist: 53 | BLOCKED (0
 | jamba | Jamba | DONE-AI | 276 | HIGH | AIScraper HTML | 307 TRUE / 0 CNV |
 | tgifridays | TGI Fridays | DONE-PDF | 220 | HIGH | AIScraper PDF | May 2025 official PDF; 729 TRUE / 0 CNV |
 | bobevans | Bob Evans | DONE-PDF | 22 | MIXED | AIScraper PDF | 53 TRUE / 40 CNV |
-| goldencorral | Golden Corral | DONE-AI | 15 | HIGH | Perplexity import | 14 TRUE; SafeBite Mar 2026 |
+| goldencorral | Golden Corral | DONE-AI | 15 | MIXED | Perplexity import | 14 TRUE; SafeBite Mar 2026 (partially real from nutrition PDF) |
 | bjsrestaurants | BJ's Restaurants | BLOCKED | 0 | — | — | Allergen guides page is JS-rendered; Scene7 PDF is nutrition-only |
 | yardhouse | Yard House | DONE-AI | 195 | HIGH | AIScraper HTML | 485 TRUE / 10 CNV |
 | veggiegrill | Veggie Grill | DONE-PDF | 91 | HIGH | AIScraper PDF | GetBento Dec 2025 allergen guide; 86 TRUE |
