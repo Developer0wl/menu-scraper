@@ -1,7 +1,7 @@
 # Allerva Scraper — Chain Progress
 
-Last updated: 2026-05-11
-Total chains: 53 | Done (any TRUE data): 33 | Checkpoints exist: 53 | BLOCKED (0 rows): 7
+Last updated: 2026-05-12
+Total chains: 53 | Done (any TRUE data): 35 | Checkpoints exist: 53 | BLOCKED (0 rows): 5
 
 ## Legend
 
@@ -49,9 +49,9 @@ Total chains: 53 | Done (any TRUE data): 33 | Checkpoints exist: 53 | BLOCKED (0
 | modpizza | MOD Pizza | DONE-LIVE | 83 | HIGH | HTML scraper | modpizza.com/allergen/ static table; 64 TRUE / 0 CNV |
 | pfchangs | P.F. Chang's | DONE-PDF | 174 | HIGH | AIScraper PDF | 2026 allergen matrix; Layout D text-X; 162 TRUE |
 | smashburger | Smashburger | DONE-CNV | 21 | CNV | CNV | Perplexity data suspicious (cheeseburgers missing Milk) — reverted |
-| whitecastle | White Castle | BLOCKED | 0 | — | — | All PDFs crash sidecar (likely scanned images) |
+| whitecastle | White Castle | DONE-LIVE | 209 | HIGH | HTML JSON scraper | 181 TRUE; embedded JSON in whitecastle.com/about-us/restaurant-menu-ingredient-list |
 | carlsjr | Carl's Jr. | DONE-AI | 131 | HIGH | AIScraper HTML | 229 TRUE / 0 CNV |
-| hardees | Hardee's | BLOCKED | 0 | — | — | All getmedia PDF URLs return 403 |
+| hardees | Hardee's | DONE-AI | 131 | HIGH | Gemini 2.5 Flash PDF | 62 TRUE; carlsjr.com shared CKE nutrition PDF |
 | steak_n_shake | Steak 'n Shake | DONE-AI | 15 | MIXED | AIScraper HTML | 24 TRUE / 81 CNV |
 | bojangles | Bojangles | DONE-PDF | 136 | HIGH | AIScraper PDF | Layout C (merged header); 140 TRUE / 0 CNV |
 | qdoba | Qdoba | DONE-PDF | 28 | HIGH | AIScraper PDF | ctfassets allergen guide; 25 TRUE / 0 CNV |

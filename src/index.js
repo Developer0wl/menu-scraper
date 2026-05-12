@@ -71,6 +71,13 @@ const AI_CHAINS = {
   pandaexpress:       { chainName: 'PandaExpress',        officialUrl: 'https://www.pandaexpress.com/nutritioninformation' },
   raisingcanes:       { chainName: 'RaisingCanes',        officialUrl: 'https://www.raisingcanes.com/allergens/' },
   tacobell:           { chainName: 'TacoBell',            officialUrl: 'https://www.tacobell.com/nutrition/allergens' },
+
+  // Session 9 — retry with AI scraper
+  cava:               { chainName: 'CAVA',               officialUrl: 'https://cava.com/menu/nutrition' },
+  whataburger:        { chainName: 'Whataburger',         officialUrl: 'https://whataburger.com/food/allergens' },
+
+  // Session 9 — Hardee's uses Carl's Jr. shared PDF (CKE Restaurants parent)
+  hardees:            { chainName: 'Hardees',             officialUrl: 'https://www.carlsjr.com/getContentAsset/cccf694a-3d94-4cbc-adfc-28c255939f92/dfc3d011-8f63-43f6-9ed8-4b444333a1d0/nutritional-info.pdf?language=en-US' },
 };
 
 // ── Registry of all chain scrapers ─────────────────────────────────────────

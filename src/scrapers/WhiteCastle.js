@@ -1,110 +1,147 @@
 ﻿'use strict';
+const https = require('https');
 const BaseScraper = require('./BaseScraper');
 const { logger } = require('../utils/logger');
 const { makeEmptyRow, ALLERGENS } = require('../output/schema');
 
-const OFFICIAL_URL = 'https://www.whitecastle.com/menu/nutrition';
-const ALT_URL = 'https://www.whitecastle.com/menu';
-const COLUMN_MAP = { 'milk':'milk','dairy':'milk','egg':'eggs','eggs':'eggs','fish':'fish','shellfish':'shellfish','tree nut':'treeNuts','tree nuts':'treeNuts','peanut':'peanuts','peanuts':'peanuts','wheat':'wheat','gluten':'wheat','soy':'soy','soybean':'soy','sesame':'sesame' };
-const KNOWN_ITEMS = [
-  { name: 'Original Slider',              category: 'Sliders' },
-  { name: 'Cheeseburger Slider',          category: 'Sliders' },
-  { name: 'Double Slider',                category: 'Sliders' },
-  { name: 'Jalapeño Cheese Slider',       category: 'Sliders' },
-  { name: 'Bacon Cheese Slider',          category: 'Sliders' },
-  { name: 'Impossible Slider',            category: 'Sliders' },
-  { name: 'Chicken Rings (6 piece)',      category: 'Chicken' },
-  { name: 'Chicken Rings (9 piece)',      category: 'Chicken' },
-  { name: 'Chicken Slider',               category: 'Chicken' },
-  { name: 'Spicy Chicken Slider',         category: 'Chicken' },
-  { name: 'Fish Slider',                  category: 'Fish' },
-  { name: 'Clam Strips',                  category: 'Fish' },
-  { name: 'Breakfast Slider',             category: 'Breakfast' },
-  { name: 'Egg & Cheese Slider',          category: 'Breakfast' },
-  { name: 'Sausage, Egg & Cheese Slider', category: 'Breakfast' },
-  { name: 'Loaded Breakfast Slider',      category: 'Breakfast' },
-  { name: 'French Fries',                 category: 'Sides' },
-  { name: 'Onion Chips',                  category: 'Sides' },
-  { name: 'Cheese Sticks (3 piece)',      category: 'Sides' },
-  { name: 'Vanilla Shake',                category: 'Drinks' },
-  { name: 'Chocolate Shake',              category: 'Drinks' },
-  { name: 'Strawberry Shake',             category: 'Drinks' },
-];
+const OFFICIAL_URL = 'https://www.whitecastle.com/about-us/restaurant-menu-ingredient-list';
+
+// WC field name → our schema key
+const WC_KEY_MAP = {
+  'Milk':      'milk',
+  'Egg':       'eggs',
+  'Fish':      'fish',
+  'Shellfish': 'shellfish',
+  'Tree nuts': 'treeNuts',
+  'Peanuts':   'peanuts',
+  'Wheat':     'wheat',
+  'Soybean':   'soy',
+  // Sesame not present in WC data — left as COULD_NOT_VERIFY
+};
+
+// Fix UTF-8 text that was incorrectly decoded as Latin-1 (Windows mojibake)
+function fixMojibake(str) {
+  return str
+    .replace(/Â®/g, '®')   // Â® → ®
+    .replace(/Â©/g, '©')   // Â© → ©
+    .replace(/Â½/g, '½')   // Â½ → ½
+    .replace(/â/g, '’')  // â€™ → '
+    .replace(/â/g, '“')  // â€œ → "
+    .replace(/â/g, '”'); // â€  → "
+}
+
+function parseWcValue(v) {
+  if (v === 'WC_CONTAINS_ALERGENS') return 'TRUE';
+  if (v === 'WC_MAY_CONTAIN_ALERGENS') return 'TRUE'; // err on side of caution
+  return 'FALSE';
+}
+
+function fetchHtml(url) {
+  return new Promise((resolve, reject) => {
+    const options = {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml',
+      },
+    };
+    https.get(url, options, res => {
+      const bufs = [];
+      res.on('data', chunk => bufs.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)));
+      res.on('end', () => resolve({ status: res.statusCode, body: Buffer.concat(bufs).toString('utf8') }));
+    }).on('error', reject);
+  });
+}
 
 class WhiteCastle extends BaseScraper {
-  constructor() { super({ chainName: 'WhiteCastle', officialUrl: OFFICIAL_URL }); this._headers = null; }
+  constructor() { super({ chainName: 'WhiteCastle', officialUrl: OFFICIAL_URL }); }
 
-  async discoverMenuItems() {
-    let ok = await this.navigateTo(OFFICIAL_URL);
-    if (!ok) ok = await this.navigateTo(ALT_URL);
-    if (!ok) { logger.warn('Could not load page — using known items', { chain: this.chainName }); return KNOWN_ITEMS; }
-    try { await this.page.waitForLoadState('networkidle', { timeout: 25000 }); } catch { /* ok */ }
-    await this.page.waitForTimeout(3000);
-    await this.takeScreenshot('nutrition-page');
-    const tableItems = await this._parseTable();
-    if (tableItems.length > 0) { logger.info(`Table parse: ${tableItems.length} items`, { chain: this.chainName }); return tableItems; }
-    const bodyItems = await this._parseBodyText();
-    if (bodyItems.length > 0) return bodyItems;
-    logger.warn(`Falling back to ${KNOWN_ITEMS.length} known items`, { chain: this.chainName });
-    return KNOWN_ITEMS;
-  }
+  async init() {}
+  async close() {}
 
-  async _parseTable() {
-    const data = await this.page.evaluate(() => {
-      const tables = Array.from(document.querySelectorAll('table'));
-      if (!tables.length) return null;
-      const best = tables.reduce((a,b) => b.querySelectorAll('tr').length > a.querySelectorAll('tr').length ? b : a);
-      const rows = Array.from(best.querySelectorAll('tr'));
-      if (rows.length < 2) return null;
-      const headers = Array.from(rows[0].querySelectorAll('th,td')).map(c=>(c.innerText||'').trim().toLowerCase());
-      const items = []; let cat = 'Sliders';
-      for (let i = 1; i < rows.length; i++) {
-        const cells = Array.from(rows[i].querySelectorAll('td,th'));
-        if (!cells.length) continue;
-        const name = (cells[0].innerText||'').trim(); if (!name) continue;
-        if (cells.length <= 1) { cat = name; continue; }
-        const values = cells.slice(1).map(cell => {
-          const txt=(cell.innerText||'').trim().toLowerCase();
-          const icon=!!(cell.querySelector('img,svg,[class*="check"],[class*="icon"]'));
-          const aria=(cell.getAttribute('aria-label')||'').toLowerCase();
-          return (icon||aria.includes('yes')||aria.includes('contain')||(txt&&txt!=='-'&&txt!=='n/a'&&txt!=='no'&&txt.length<6))?'present':'';
-        });
-        items.push({ name, category: cat, _values: values });
-      }
-      return { headers, items };
-    });
-    if (!data||!data.items.length) return [];
-    this._headers = data.headers; return data.items;
-  }
+  async scrape() {
+    logger.info('Fetching White Castle HTML directly', { chain: this.chainName });
+    this.results = [];
+    this.errors  = [];
 
-  async _parseBodyText() {
-    const body = await this.page.innerText('body').catch(()=>'');
-    const lines = body.split('\n').map(l=>l.trim()).filter(Boolean);
-    const items = []; let cat = 'Sliders'; const seen = new Set();
-    for (const line of lines) {
-      const lower = line.toLowerCase();
-      if (line.length < 50 && /^[A-Z][A-Z\s&\-\/]+$/.test(line)) { cat = line; continue; }
-      if (lower.includes('contains')&&(lower.includes('milk')||lower.includes('wheat')||lower.includes('soy')||lower.includes('egg'))) {
-        const name = line.slice(0,80); if (!seen.has(name)) { seen.add(name); items.push({ name, category: cat, _rawText: line }); }
+    let body;
+    try {
+      const res = await fetchHtml(OFFICIAL_URL);
+      if (res.status !== 200) throw new Error(`HTTP ${res.status}`);
+      body = res.body;
+    } catch (err) {
+      logger.error(`Fetch failed: ${err.message}`, { chain: this.chainName });
+      this._discoveredCount = 0;
+      return [];
+    }
+
+    // Extract the wc-nutrition-information component data attribute
+    const match = body.match(/wc-nutrition-information\s+:data='(\{[^']+\})'/);
+    if (!match) {
+      logger.warn('Could not find embedded allergen JSON in White Castle HTML', { chain: this.chainName });
+      this._discoveredCount = 0;
+      return [];
+    }
+
+    let menuData;
+    try {
+      menuData = JSON.parse(match[1]);
+    } catch (e) {
+      logger.error(`JSON parse failed: ${e.message}`, { chain: this.chainName });
+      this._discoveredCount = 0;
+      return [];
+    }
+
+    const rows = [];
+    const scrapeDate = new Date().toISOString();
+
+    for (const [rawCategory, items] of Object.entries(menuData)) {
+      const category = rawCategory.replace(/\*$/, '').trim(); // strip trailing *
+      if (!Array.isArray(items)) continue;
+
+      for (const item of items) {
+        if (!item.title || !item.data) continue;
+
+        const row = makeEmptyRow();
+        row.menuCategory = category;
+        row.itemName     = fixMojibake(item.title.trim());
+        row.sourceUrl    = OFFICIAL_URL;
+        row.scrapeDate   = scrapeDate;
+
+        const allergenData = item.data;
+        let hasTrueAllergen = false;
+        let hasMayContain   = false;
+
+        for (const [wcKey, ourKey] of Object.entries(WC_KEY_MAP)) {
+          const val = allergenData[wcKey];
+          if (val === 'WC_CONTAINS_ALERGENS') {
+            row[ourKey] = 'TRUE';
+            hasTrueAllergen = true;
+          } else if (val === 'WC_MAY_CONTAIN_ALERGENS') {
+            row[ourKey] = 'TRUE';
+            hasMayContain = true;
+          } else {
+            row[ourKey] = 'FALSE';
+          }
+        }
+        // Sesame not tracked by White Castle
+        row.sesame = 'COULD_NOT_VERIFY';
+
+        row.crossContact = hasMayContain ? 'TRUE' : 'FALSE';
+        row.confidence   = hasTrueAllergen || hasMayContain ? 'HIGH' : 'HIGH';
+        row.sourceText   = 'White Castle embedded allergen JSON — whitecastle.com/about-us/restaurant-menu-ingredient-list';
+        row.rowNum       = rows.length + 1;
+
+        this.validateRow(row);
+        rows.push(row);
       }
     }
-    logger.info(`Body text: ${items.length} items`, { chain: this.chainName }); return items;
-  }
 
-  async extractAllergens(item) {
-    const row = makeEmptyRow();
-    row.menuCategory = item.category; row.itemName = item.name;
-    row.sourceUrl = OFFICIAL_URL; row.scrapeDate = new Date().toISOString();
-    if (item._rawText) { Object.assign(row, this.parseAllergenText(item._rawText)); if (ALLERGENS.some(a=>row[a]==='TRUE')) return row; }
-    if (item._values && this._headers) {
-      const present = []; let anyMapped = false;
-      this._headers.forEach((header,i) => { const key=COLUMN_MAP[header]; if (!key) return; const isPresent=item._values[i-1]==='present'; if (isPresent) present.push(header); row[key]=isPresent?'TRUE':'FALSE'; anyMapped=true; });
-      if (anyMapped) { row.confidence='HIGH'; row.crossContact='NO'; row.sourceText=present.length>0?`Contains: ${present.join(', ')}`:'No allergens listed'; return row; }
-    }
-    for (const a of ALLERGENS) row[a]='COULD_NOT_VERIFY';
-    row.crossContact='COULD_NOT_VERIFY'; row.confidence='COULD_NOT_VERIFY';
-    row.sourceText='Allergen data not accessible — check whitecastle.com/menu/nutrition';
-    return row;
+    this.results          = rows;
+    this._discoveredCount = rows.length;
+    logger.info(`White Castle: ${rows.length} rows extracted`, { chain: this.chainName });
+    return rows;
   }
 }
+
 module.exports = WhiteCastle;
+
