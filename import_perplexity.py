@@ -27,6 +27,34 @@ CNV_CHAINS = {
     "jerseymikes":   "Jersey Mike's Subs",
 }
 
+# 24 chains currently in the app but missing from our scraper
+APP_CHAINS = {
+    "burgerking":        "Burger King",
+    "wendys":            "Wendy's",
+    "kfc":               "KFC",
+    "popeyes":           "Popeyes",
+    "sonic":             "Sonic",
+    "arbys":             "Arby's",
+    "jackinthebox":      "Jack in the Box",
+    "dairyqueen":        "Dairy Queen",
+    "shakeshack":        "Shake Shack",
+    "dominos":           "Domino's",
+    "papajohns":         "Papa John's",
+    "pizzahut":          "Pizza Hut",
+    "olivegarden":       "Olive Garden",
+    "starbucks":         "Starbucks",
+    "dunkin":            "Dunkin",
+    "panerabread":       "Panera Bread",
+    "applebees":         "Applebee's",
+    "buffalowildwings":  "Buffalo Wild Wings",
+    "chilis":            "Chili's",
+    "dennys":            "Denny's",
+    "ihop":              "IHOP",
+    "outbacksteakhouse": "Outback Steakhouse",
+    "redlobster":        "Red Lobster",
+    "cheesecakefactory": "The Cheesecake Factory",
+}
+
 ALLERGEN_COLS = {
     "milk":      4,   # col E (0-indexed from col B at idx 1)
     "eggs":      5,
@@ -131,12 +159,16 @@ def extract_sheet(ws, chain_key, sheet_name):
 
 
 def main():
-    print(f"Loading {EXCEL_PATH.name}...")
+    import sys
+    mode = sys.argv[1] if len(sys.argv) > 1 else "app"
+    chains_to_import = APP_CHAINS if mode == "app" else CNV_CHAINS
+    print(f"Loading {EXCEL_PATH.name}... (mode={mode}, {len(chains_to_import)} chains)")
+
     wb = openpyxl.load_workbook(EXCEL_PATH, read_only=True, data_only=True)
     available_sheets = set(wb.sheetnames)
 
     results = {}
-    for chain_key, sheet_name in CNV_CHAINS.items():
+    for chain_key, sheet_name in chains_to_import.items():
         if sheet_name not in available_sheets:
             print(f"  SKIP {chain_key}: sheet '{sheet_name}' not found")
             continue

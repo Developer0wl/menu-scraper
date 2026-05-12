@@ -1,7 +1,6 @@
-# Allerva Scraper — Chain Progress
+﻿# Allerva Scraper — Chain Progress
 
-Last updated: 2026-05-12
-Total chains: 53 | Done (any TRUE data): 35 | Checkpoints exist: 53 | BLOCKED (0 rows): 5
+Last updated: 2026-05-12\nTotal chains: 53+ | Done (any TRUE data): 57 | Checkpoints exist: 53 | BLOCKED (0 rows): 5
 
 ## Legend
 
@@ -105,3 +104,4 @@ Total chains: 53 | Done (any TRUE data): 35 | Checkpoints exist: 53 | BLOCKED (0
 | teriyakimadness | 30 rows mostly FALSE/CNV — text-positioned PDF; no extractable tables |
 | whataburger | 35 rows all-FALSE — matrix parse broken |
 | cava | 1 row — matrix parse broken |
+

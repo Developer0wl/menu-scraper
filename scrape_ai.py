@@ -69,7 +69,7 @@ def build_config(provider: str, model: str) -> dict:
             "llm": {
                 "api_key": api_key,
                 "model": f"google_genai/{model}",
-                "model_tokens": 1_000_000,
+                "max_tokens": 8192,
             },
             "model_tokens": 1_000_000,
             "verbose": False,
