@@ -137,6 +137,22 @@ const SCRAPERS = {
   veggiegrill:        () => new (require('./scrapers/VeggieGrill'))(),
   justsalad:          () => new (require('./scrapers/JustSalad'))(),
   tropicalsmoothie:   () => new (require('./scrapers/TropicalSmoothieCafe'))(),
+  // New chains (Session 7)
+  buffalowildwings:   () => new (require('./scrapers/BuffaloWildWings'))(),
+  dennys:             () => new (require('./scrapers/Dennys'))(),
+  ihop:               () => new (require('./scrapers/IHOP'))(),
+  cheesecakefactory:  () => new (require('./scrapers/CheesecakeFactory'))(),
+  outback:            () => new (require('./scrapers/OutbackSteakhouse'))(),
+  chilis:             () => new (require('./scrapers/Chilis'))(),
+  olivegarden:        () => new (require('./scrapers/OliveGarden'))(),
+  applebees:          () => new (require('./scrapers/Applebees'))(),
+  papajohns:          () => new (require('./scrapers/PapaJohns'))(),
+  shakeshack:         () => new (require('./scrapers/ShakeShack'))(),
+  jackinthebox:       () => new (require('./scrapers/JackInTheBox'))(),
+  sonic:              () => new (require('./scrapers/Sonic'))(),
+  popeyes:            () => new (require('./scrapers/Popeyes'))(),
+  kfc:                () => new (require('./scrapers/KFC'))(),
+  arbys:              () => new (require('./scrapers/Arbys'))(),
 };
 
 const ALL_CHAIN_KEYS = Object.keys(SCRAPERS);
